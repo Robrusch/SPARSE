@@ -1,0 +1,3 @@
+channel,l,threshold,mu
+Potential well P-wave,1,0.0,1000
+Linear potential S-wave,0,inf,500
