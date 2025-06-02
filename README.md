@@ -66,8 +66,12 @@ EOF
 
 ## Repository structure
 
-The SPARSE repository contains the following files:  
-*sparse.py*: the SPARSE module itself, make sure that it is accessible from the working directory in which the CSV files are located.  
-*utils.py*: a utility module containing handy functions for the further analysis of numerical results obtained using SPARSE.  
-*example.py*: a script that automatically calculates and writes two examples of working CSV files.  
-*SPARSE-tutorial.ipynb*: an IPython notebook tutorial for SPARSE.  
+The SPARSE repository contains the following files:
+
+*sparse.py*: the SPARSE module itself, make sure that it is accessible from the working directory in which the CSV files are located.
+
+*utils.py*: a utility module containing handy functions for the further analysis of numerical results obtained using SPARSE.
+
+*example.py*: a script that automatically calculates and writes two examples of working CSV files.
+
+*SPARSE-tutorial.ipynb*: an IPython notebook tutorial for SPARSE.
