@@ -21,7 +21,8 @@ def poles(k_matrix_df, **kwargs):
         Pandas DataFrame containing flattened K-matrices for various energies.
         This is typically an output of the function k_matrices from the SPARSE
         module.
-    kwargs: Keyword arguments the function scipy.interpolate.AAA. See its
+    **kwargs: optional
+        Keyword arguments the function scipy.interpolate.AAA. See its
         documentation of  for further information.
 
     Returns
