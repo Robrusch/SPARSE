@@ -35,6 +35,7 @@ The numerical Schrödinger equation is completely specified by 4 quantities:
 4. the numerical potential matrix.
 
 The channels' specifics (name, orbital angular momenta, thresholds, reduced masses) must be stored in a CSV with 1 line of header and $N$ additional lines below.
+Each line must contain 4 entries.
 The header must contain the following strings: channel, l, threshold, mu.
 The following lines must contain the corresponding values.
 The ordering of the columns is irrelevant, but must obviously be consistent with the tabular format.
@@ -49,7 +50,9 @@ NameN, lN, TN, muN
 EOF  
 
 The nodes positions and the numerical potential must be stored in a CSV file with $M$ lines and **NO header**.
-Each line begins with the node value $r$, then follows with the flattened potential matrix at the given node.
+Each line must contain $1 + N^2$ entries.
+The first entry is the node value $r$.
+The remaining $N^2$ entries are the values of the flattened potential matrix at the given node.
 SPARSE assumes that the potential is flattened in row-major (C-style) order
 (this is irrelevant if the potential matrix is symmetric).
 The typical structure of the potential's CSV file is therefore:
@@ -61,5 +64,5 @@ r2, V11(r2), V12(r2), ..., V1N(r2), V21(r2), V22(r2), ..., V2N(r2), ..., VN1(r2)
 rM, V11(rM), V12(rM), ..., V1N(rM), V21(rM), V22(rM), ..., V2N(rM), ..., VN1(rN), VN2(rN), ..., VNN(rM)  
 EOF
 
-The SPARSE module is shipped together with a script *example.py* that automatically calculates and writes
-two examples of working CSV files. Also have a look at the IPython notebook!
+## Repository structure
+
