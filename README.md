@@ -15,5 +15,3 @@ We define the threshold matrix as the limit of the potential matrix for $r\to\in
 This module focuses on cases where all limits are well defined,
 the threshold matrix is diagonal, $T=\mathrm{diag}(T_1,T_2,\dots,T_N)$, and each threshold is either a finite number or $+\infty$.
 The Schrödinger equation then admits scattering solutions for energies larger than the lowest threshold, $E \geq \min T$.
-
-The user...
