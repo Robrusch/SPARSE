@@ -12,7 +12,7 @@ from scipy.integrate import trapezoid
 from scipy.sparse import dia_array
 from scipy.sparse.linalg import eigsh
 
-# Import potential metadata from csv file.
+# Import potential metadata from file: channels.csv
 channels = pd.read_csv('channels.csv',
                        usecols=['channel', 'l', 'threshold', 'mu'],
                        dtype={
@@ -23,7 +23,7 @@ channels = pd.read_csv('channels.csv',
                            })
 channels.rename(index=lambda x: x + 1, inplace=True)
 
-# Import potential matrix from csv file.
+# Import potential matrix from file: potential.csv
 potential = pd.read_csv('potential.csv',
                         index_col=0,
                         names=pd.MultiIndex.from_product(2 * [channels.index]),
@@ -36,7 +36,7 @@ threshold = channels.threshold.to_numpy()
 mu = channels.mu.to_numpy()
 r = potential.index.to_numpy()
 
-# Reshape potential.
+# Reshape the potential.
 # Will result in an error if input potential is misshaped.
 n = len(channels)
 m = len(potential)
@@ -61,11 +61,13 @@ elims = np.empty((2 + np.count_nonzero(scattering), 2))
 
 # Overall lower and upper limits are set as (-inf, lower) and (upper, +inf).
 # The lower limit is the lowest finite threshold.
-elims[0] = (-np.inf, min(threshold))
+elims[0] = (-np.inf, threshold.min())
 # The upper limit is dictated by the maximum scattering momentum or
 # the potentials for non-scattering channels, whichever is smaller.
-elims[1] = (min(*(pmax**2 / (2 * mu[scattering]) + threshold[scattering]),
-                    *np.diag(pot[-1])[~scattering]), np.inf)
+elims[1] = (np.concatenate(
+    (pmax**2 / (2 * mu[scattering]) + threshold[scattering],
+    np.diag(pot[-1])[~scattering])).min(),
+    np.inf)
 
 # Establish exclusion zones for energies close to finite thresholds.
 if any(scattering):
@@ -97,27 +99,26 @@ if any(scattering):
     elims[2:, 1] = threshold[scattering] \
         + free_p_min ** 2 / (2 * mu[scattering])
 
+# Add the centrifugal energy term to the potential matrix.
+pot += np.tensordot(r ** -2, np.diag(l * (l + 1) / (2 * mu)), axes=0)
+
 # The Hamiltonian matrix is real, square matrix of dimension (n * m)^2.
-# It has only (2 * n + 1) nonzero diagonals with the main one at the center.
-# The Hamiltonian is stored using the matrix diagonal ordered form.
+# It has only 2 * n + 1 nonzero diagonals with the main one at the center.
+# The Hamiltonian is stored using the (padded) matrix diagonal ordered form.
 # See the documentation of scipy.linalg.solve_banded for more information.
 diags = np.zeros((2 * n + 1, n * m))
-# The uppermost diagonal is given by the uppermost kinetic energy diagonal.
+# The potential matrix has 2 * n - 1 diagonals centered on the main one.
+# They add to the corresponding diagonals of the Hamiltonian.
+for k in range(n - 1, -n, -1):
+    jmin = k if k > 0 else 0
+    jmax = n + (k if k < 0 else 0)
+    for i in range(m):
+        diags[n - k, n * i:][jmin: jmax] = np.diag(pot[i], k)
+# The radial kinetic energy matrix has only three nonzero diagonals.
+# They add to the Hamiltonian's uppermost, central, and lowermost diagonals.
 diags[0, n:] = np.tile(-1 / (2 * mu * dr ** 2), m - 1)
-for i, v in enumerate(pot):
-    for k in range(n - 1, -n, -1):
-        if k == 0:
-            # The central diagonal is the sum of the central potential diagonal
-            # and the central kinetic energy diagonal.
-            diag = np.diag(v, k) + \
-                1 / (mu * dr ** 2) + l * (l + 1) / (2 * mu * r[i]**2)
-        else:
-            # Every other diagonal is given by potential diagonals.
-            diag = np.diag(v, k)
-        jmin = i * n + (k if k > 0 else 0)
-        diags[n - k, jmin: jmin + len(diag)] = diag
-# The lowermost diagonal is given by the lowermost kinetic energy diagonal.
-diags[-1, :-n] = np.tile(-1 / (2 * mu * dr ** 2), m - 1)
+diags[n] += np.tile(1 / (mu * dr ** 2), m)
+diags[-1, :-n] = diags[0, n:]
 
 
 def k_matrix(energy, rtol=1e-2):
