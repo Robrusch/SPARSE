@@ -9,6 +9,7 @@ $\psi(r)=(\psi_1(r),\psi_2(r),\dots,\psi_N(r))$ is a wave function with N channe
 $\mu = \mathrm{diag}(\mu_1, \mu_2, \dots, \mu_N)$ is a diagonal reduced-mass matrix,
 $L=\mathrm{diag}(L_1, L_2, \dots, L_N)$ is a diagonal orbital-angular-momentum matrix,
 and $V(r)$ is a $N \times N$ potential matrix with both diagonal and off-diagonal entries that depends on $r$.
+Note that we use natural units: $\hbar=c=1$
 
 We define the threshold matrix as the limit of the potential matrix for $r\to\infty$: $T=\lim_{r\to\infty}V(r)$.
 This module focuses on cases where all limits are well defined,
