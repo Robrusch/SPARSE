@@ -1,7 +1,5 @@
 # SPARSE: Scattering Poles and Amplitudes from Radial Schrödinger Equations
 
-## Introduction
-
 This algorithm calculates scattering amplitudes from a two-body, multi-channel, radial Schrödinger equation in the form:
 
 $$\left(-\frac{1}{2 \mu} \frac{\mathrm{d}^2}{\mathrm{d}r^2} + \frac{L (L + 1)}{2 \mu r^2} + V(r) \right) \psi(r) = E \psi(r)$$
