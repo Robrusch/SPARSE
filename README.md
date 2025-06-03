@@ -16,7 +16,7 @@ This module focuses on cases where all limits are well defined,
 the threshold matrix is diagonal, $T=\mathrm{diag}(T_1,T_2,\dots,T_N)$, and each threshold is either a finite number or $+\infty$.
 The Schrödinger equation then admits scattering solutions for energies larger than the lowest threshold, $E \geq \min T$.
 
-SPARSE solves the Schrödinger numerically using the finite difference method by sampling the continuous distance $r$ on a discrete
+SPARSE solves the Schrödinger equation numerically using the finite difference method by sampling the continuous distance $r$ on a discrete
 lattice of point separated by a constant distance $\mathrm{d}r$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
 $r_i=i ~ \mathrm{d}r$ with $i=1,\dots,M$, and ends at $r_\text{max}=(M+1) \mathrm{d}r$.
 The wave function $\psi$ with N channels is treated as a numerical array containing its values at each of the M interior nodes of $r$.
@@ -70,6 +70,6 @@ The SPARSE repository contains the following files:
 
 *utils.py*: a utility module containing handy functions for the further analysis of numerical results obtained using SPARSE.
 
-*example_potential.py*: a script that automatically calculates an example potential matrix and writes it into CSV files compatible with SPARSE.
+*example_potential.py*: a Python script that automatically calculates an example potential matrix and writes it into CSV files compatible with SPARSE.
 
 *SPARSE-tutorial.ipynb*: an IPython notebook tutorial for SPARSE, check it out!
