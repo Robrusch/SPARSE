@@ -66,7 +66,7 @@ elims[0] = (-np.inf, threshold.min())
 # the potentials for non-scattering channels, whichever is smaller.
 elims[1] = (np.concatenate(
     (pmax**2 / (2 * mu[scattering]) + threshold[scattering],
-    np.diag(pot[-1])[~scattering])).min(),
+    np.diagonal(pot[-1])[~scattering])).min(),
     np.inf)
 
 # Establish exclusion zones for energies close to finite thresholds.
@@ -76,7 +76,7 @@ if any(scattering):
     pot_is_flat = np.all(
         np.isclose(
             pot[np.ix_(range(m), scattering, scattering)],
-            np.diag(threshold[scattering]),
+            np.diagflat(threshold[scattering]),
             atol=1e-8),  # <- change "1e-8" if needed
         axis=(1,2))
     # Check that the potential radius is within the coordinate space.
@@ -130,7 +130,7 @@ def k_matrix(energy, rtol=1e-2):
     energy : float
         Input energy value, must be outside all regions excluded by elims.
     rtol : float, optional
-        Relative asymmetry tolerance for the K-matrix. The default is 1e-2.
+        Relative asymmetry tolerance for the K-matrix. The default is 1%.
 
     Returns
     -------
@@ -143,8 +143,8 @@ def k_matrix(energy, rtol=1e-2):
     o = np.count_nonzero(is_open)
     ab = hamiltonian.copy()
     ab[n] -= energy
-    b = np.zeros((m * n, o))
-    b[-n:][is_open] = np.diag(1 / (2 * mu[is_open] * dr ** 2))
+    b = np.zeros((n * m, o))
+    b[-n:][is_open] = np.diagflat(kinetic[is_open])
     vec = solve_banded((n, n), ab, b, overwrite_ab=True,
                        overwrite_b=True, check_finite=False)
     sol = vec.reshape(m, n, o)[:, is_open]
