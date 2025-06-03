@@ -112,15 +112,14 @@ hamiltonian = np.empty((2 * n + 1, n * m))
 for k in range(n - 1, -n, -1):
     diags = np.diagonal(pot, offset=k, axis1=1, axis2=2)
     padded_diags = np.pad(diags,
-                          ((0,0), (k if k > 0 else 0, -k if k < 0 else 0)),
-                          'constant')
+                          ((0,0), (k if k > 0 else 0, -k if k < 0 else 0)))
     hamiltonian[n - k] = padded_diags.flatten()
 # The radial kinetic energy matrix has only three nonzero diagonals.
 # They add to the Hamiltonian's uppermost, central, and lowermost diagonals.
 kinetic = 1 / (2 * mu * dr ** 2)
-hamiltonian[0] = np.pad(np.tile(-kinetic, m - 1), (n, 0), 'constant')
+hamiltonian[0] = np.pad(np.tile(-kinetic, m - 1), (n, 0))
 hamiltonian[n] += np.tile(2 * kinetic, m)
-hamiltonian[-1] = np.pad(np.tile(-kinetic, m - 1), (0, n), 'constant')
+hamiltonian[-1] = np.pad(np.tile(-kinetic, m - 1), (0, n))
 
 def k_matrix(energy, rtol=1e-2):
     """
