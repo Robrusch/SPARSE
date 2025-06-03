@@ -100,26 +100,27 @@ if any(scattering):
         + free_p_min ** 2 / (2 * mu[scattering])
 
 # Add the centrifugal energy term to the potential matrix.
-pot += np.tensordot(r ** -2, np.diag(l * (l + 1) / (2 * mu)), axes=0)
+pot[:, range(n), range(n)] += np.outer(r ** -2, l * (l + 1) / (2 * mu))
 
 # The Hamiltonian matrix is real, square matrix of dimension (n * m)^2.
 # It has only 2 * n + 1 nonzero diagonals with the main one at the center.
 # The Hamiltonian is stored using the (padded) matrix diagonal ordered form.
 # See the documentation of scipy.linalg.solve_banded for more information.
-diags = np.zeros((2 * n + 1, n * m))
+hamiltonian = np.empty((2 * n + 1, n * m))
 # The potential matrix has 2 * n - 1 diagonals centered on the main one.
 # They add to the corresponding diagonals of the Hamiltonian.
 for k in range(n - 1, -n, -1):
-    jmin = k if k > 0 else 0
-    jmax = n + (k if k < 0 else 0)
-    for i in range(m):
-        diags[n - k, n * i:][jmin: jmax] = np.diag(pot[i], k)
+    diags = np.diagonal(pot, offset=k, axis1=1, axis2=2)
+    padded_diags = np.pad(diags,
+                          ((0,0), (k if k > 0 else 0, -k if k < 0 else 0)),
+                          'constant')
+    hamiltonian[n - k] = padded_diags.flatten()
 # The radial kinetic energy matrix has only three nonzero diagonals.
 # They add to the Hamiltonian's uppermost, central, and lowermost diagonals.
-diags[0, n:] = np.tile(-1 / (2 * mu * dr ** 2), m - 1)
-diags[n] += np.tile(1 / (mu * dr ** 2), m)
-diags[-1, :-n] = diags[0, n:]
-
+kinetic = 1 / (2 * mu * dr ** 2)
+hamiltonian[0] = np.pad(np.tile(-kinetic, m - 1), (n, 0), 'constant')
+hamiltonian[n] += np.tile(2 * kinetic, m)
+hamiltonian[-1] = np.pad(np.tile(-kinetic, m - 1), (0, n), 'constant')
 
 def k_matrix(energy, rtol=1e-2):
     """
@@ -141,7 +142,7 @@ def k_matrix(energy, rtol=1e-2):
     assert all((energy < elims[:, 0]) | (energy > elims[:, 1]))
     is_open = energy > threshold
     o = np.count_nonzero(is_open)
-    ab = diags.copy()
+    ab = hamiltonian.copy()
     ab[n] -= energy
     b = np.zeros((m * n, o))
     b[-n:][is_open] = np.diag(1 / (2 * mu[is_open] * dr ** 2))
@@ -230,7 +231,7 @@ def bound_states(n_states, energy_guess):
     emax = min(elims[[0, 1], [1, 0]])
     assert energy_guess < emax
     offsets = np.arange(n, -n - 1, -1)
-    hb = dia_array((diags, offsets), shape=(n * m, n * m))
+    hb = dia_array((hamiltonian, offsets), shape=(n * m, n * m))
     eigenvalues, eigenvectors = eigsh(hb, k=n_states, sigma=energy_guess)
     if any(above := eigenvalues > emax):
         print(f'Removing {np.count_nonzero(above)} states above {emax}')
