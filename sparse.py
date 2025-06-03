@@ -102,7 +102,7 @@ if any(scattering):
 # Add the centrifugal energy term to the potential matrix.
 pot[:, range(n), range(n)] += np.outer(r ** -2, l * (l + 1) / (2 * mu))
 
-# The Hamiltonian matrix is real, square matrix of dimension (n * m)^2.
+# The Hamiltonian matrix is a real, square matrix of dimension (n * m)^2.
 # It has only 2 * n + 1 nonzero diagonals with the main one at the center.
 # The Hamiltonian is stored using the (padded) matrix diagonal ordered form.
 # See the documentation of scipy.linalg.solve_banded for more information.
