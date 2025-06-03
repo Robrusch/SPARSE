@@ -70,6 +70,6 @@ The SPARSE repository contains the following files:
 
 *utils.py*: a utility module containing handy functions for the further analysis of numerical results obtained using SPARSE.
 
-*example.py*: a script that automatically calculates an example potential matrix and writes it into CSV files compatible with SPARSE.
+*example_potential.py*: a script that automatically calculates an example potential matrix and writes it into CSV files compatible with SPARSE.
 
 *SPARSE-tutorial.ipynb*: an IPython notebook tutorial for SPARSE, check it out!
