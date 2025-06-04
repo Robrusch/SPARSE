@@ -94,5 +94,3 @@ The SPARSE repository contains the following files:
 *SPARSE_tutorial.ipynb*: an IPython notebook tutorial for SPARSE, check it out!
 
 *requirements.txt*: list of package requirements for the SPARSE module and its utility functions.
-
-*LICENSE.txt*: MIT license and copyright notice
