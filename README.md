@@ -66,15 +66,15 @@ EOF
 
 Below is a dimensional analysis of the inputs.
 
-**channels.csv**  
-*name*: N/A (it is a string)  
-*l*: dimensionless (it is an integer)  
-*threshold*: [Energy]  
-*mu*: [Mass]  
+**Columns of channels.csv:**  
+(1) *name*: N/A (it is a string)  
+(2) *l*: dimensionless (it is an integer)  
+(3) *threshold*: [Energy]  
+(4) *mu*: [Mass]  
 
-**potential.csv**  
-*r*: [Length]  
-*V*: [Energy]  
+**Columns of potential.csv:**  
+(1) *r*: [Length]  
+(2, 3, ..., $N^2$) *V*: [Energy]  
 
 The SPARSE algorithm uses natural units, in which $\hbar=c=1$ and therefore $[\text{Mass}]=[\text{Energy}]$ and $[\text{Length}]=[\text{Energy}]^{-1}$.
 There is only one independent dimension, typically chosen between [Length] in units of fm (femtometers) and [Energy] in units of eV (electron Volts).
