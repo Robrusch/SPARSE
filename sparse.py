@@ -36,72 +36,17 @@ threshold = channels.threshold.to_numpy()
 mu = channels.mu.to_numpy()
 r = potential.index.to_numpy()
 
+# Check that the coordinates are positive, equally spaced, and start from 0.
+dr = r[0]
+assert dr > 0 and np.allclose(np.diff(r), dr)
+
 # Reshape the potential.
 # Will result in an error if input potential is misshaped.
 n = len(channels)
 m = len(potential)
 pot = potential.to_numpy().reshape(m, n, n)
 
-# Check that the coordinates are positive, equally spaced, and start from 0.
-dr = r[0]
-assert dr > 0 and np.allclose(np.diff(r), dr)
-
-# Establish the scattering channels as those with a finite threshold.
-scattering = threshold < np.inf
-
-# Calculate the maximum momentum based on the discretization distance.
-# The number in the denominator should be bigger than 1.
-pmax = np.pi / (dr * 500)  # <- change "500" if needed
-
-# Establish the energy values excluded from calculating the amplitudes.
-# The limits are structured as a (2 + N, 2)-array where N is the number
-# of scattering channels. Each row of the array is a pair of values.
-# Values within any such pair of values is excluded.
-elims = np.empty((2 + np.count_nonzero(scattering), 2))
-
-# Overall lower and upper limits are set as (-inf, lower) and (upper, +inf).
-# The lower limit is the lowest finite threshold.
-elims[0] = (-np.inf, threshold.min())
-# The upper limit is dictated by the maximum scattering momentum or
-# the potentials for non-scattering channels, whichever is smaller.
-elims[1] = (np.concatenate(
-    (pmax**2 / (2 * mu[scattering]) + threshold[scattering],
-    np.diagonal(pot[-1])[~scattering])).min(),
-    np.inf)
-
-# Establish exclusion zones for energies close to finite thresholds.
-if any(scattering):
-    # Calculate the radius of the potential for scattering channels.
-    # The potential is considered 0 if its value is less than atol.
-    pot_is_flat = np.all(
-        np.isclose(
-            pot[np.ix_(range(m), scattering, scattering)],
-            np.diagflat(threshold[scattering]),
-            atol=1e-8),  # <- change "1e-8" if needed
-        axis=(1,2))
-    # Check that the potential radius is within the coordinate space.
-    assert pot_is_flat[-1]
-    # Calculate the potential radius.
-    r_pot = r[~pot_is_flat][-1]
-    # Calculate the maximum binding momentum based on the maximum distance.
-    # The number in the numerator should be bigger than 1.
-    bound_p_max = 10 / r[-1]  # change "10" if needed
-    # Calculate the minimum scattering momentum based on the potential radius
-    # or the condition that the analytic scattering states are approximately
-    # sine and cosine functions, whichever is smaller.
-    # The number in the numerator of the second term should be bigger than 1.
-    free_p_min = np.maximum(
-        np.pi / (r[-1] - r_pot),
-        (10 * l[scattering] + np.pi) / r[-1])  # change "10" if needed
-    # Amplitudes cannot be calculated for energies too close to threshold.
-    elims[2:, 0] = threshold[scattering] \
-        - bound_p_max ** 2 / (2 * mu[scattering])
-    elims[2:, 1] = threshold[scattering] \
-        + free_p_min ** 2 / (2 * mu[scattering])
-
-# Add the centrifugal energy term to the potential matrix.
-pot[:, range(n), range(n)] += np.outer(r ** -2, l * (l + 1) / (2 * mu))
-
+# Calculate the sparse Hamiltonian matrix.
 # The Hamiltonian matrix is a real, square matrix of dimension (n * m)^2.
 # It has only 2 * n + 1 nonzero diagonals with the main one at the center.
 # The Hamiltonian is stored using the (padded) matrix diagonal ordered form.
@@ -114,12 +59,66 @@ for k in range(n - 1, -n, -1):
     padded_diags = np.pad(diags,
                           ((0,0), (k if k > 0 else 0, -k if k < 0 else 0)))
     hamiltonian[n - k] = padded_diags.flatten()
-# The radial kinetic energy matrix has only three nonzero diagonals.
+# The kinetic energy matrix has only three nonzero diagonals.
 # They add to the Hamiltonian's uppermost, central, and lowermost diagonals.
 kinetic = 1 / (2 * mu * dr ** 2)
 hamiltonian[0] = np.pad(np.tile(-kinetic, m - 1), (n, 0))
-hamiltonian[n] += np.tile(2 * kinetic, m)
+hamiltonian[n] += np.tile(2 * kinetic, m) \
+    + np.outer(r ** -2, l * (l + 1) / (2 * mu)).flatten()
 hamiltonian[-1] = np.pad(np.tile(-kinetic, m - 1), (0, n))
+
+# Establish the scattering channels as those with a finite threshold.
+scattering = threshold < np.inf
+
+# Establish the energy values excluded from calculating the amplitudes.
+# The limits are structured as a (2 + N, 2)-array where N is the number
+# of scattering channels. Each row of the array is a pair of values.
+# Energies within any such pair of values is excluded.
+elims = np.empty((2 + np.count_nonzero(scattering), 2))
+
+# Overall lower and upper limits are set as (-inf, lower) and (upper, +inf).
+# The lower limit is the lowest finite threshold.
+elims[0] = (-np.inf, threshold.min())
+# Calculate the maximum momentum based on the discretization distance.
+# The number in the denominator should be bigger than 1.
+pmax = np.pi / (dr * 500)  # <- change "500" if needed
+# The upper limit is dictated by the maximum scattering momentum or
+# the potentials for non-scattering channels, whichever is smaller.
+elims[1] = (np.concatenate(
+    (pmax**2 / (2 * mu[scattering]) + threshold[scattering],
+    np.diagonal(pot[-1])[~scattering])).min(),
+    np.inf)
+
+# Establish exclusion zones for energies close to finite thresholds.
+# Calculate the maximum binding momentum based on the maximum distance.
+# The number in the numerator should be bigger than 1.
+bound_p_max = 10 / r[-1]  # change "10" if needed
+# Calculate the radius of the potential for scattering channels.
+# The potential is considered 0 if its value is less than atol.
+pot_is_flat = np.all(
+    np.isclose(
+        pot[np.ix_(range(m), scattering, scattering)],
+        np.diagflat(threshold[scattering]),
+        atol=1e-8),  # <- change "1e-8" if needed
+    axis=(1,2))
+# Check that the potential radius is within the coordinate space.
+assert pot_is_flat[-1]
+# Calculate the potential radius, ensuring that it is at least r[0].
+pot_is_flat[0] = False
+r_pot = r[~pot_is_flat][-1]
+# Calculate the minimum scattering momentum based on the potential radius
+# or the condition that the analytic scattering states are approximately
+# sine and cosine functions, whichever is smaller.
+# The number in the numerator of the second term should be bigger than 1.
+free_p_min = np.maximum(
+    np.pi / (r[-1] - r_pot),
+    (10 * l[scattering] + np.pi) / r[-1])  # change "10" if needed
+# Exclude energies too close to threshold.
+elims[2:, 0] = threshold[scattering] \
+    - bound_p_max ** 2 / (2 * mu[scattering])
+elims[2:, 1] = threshold[scattering] \
+    + free_p_min ** 2 / (2 * mu[scattering])
+
 
 def k_matrix(energy, rtol=1e-2):
     """
