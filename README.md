@@ -48,7 +48,7 @@ NameN, lN, TN, muN
 EOF  
 
 The nodes positions and the numerical potential must be stored in a CSV file with $M$ lines and **NO header**.
-Each line must contain $1 + N^2$ entries.
+Each line must contain $N^2 + 1$ entries.
 The first entry is the node value $r$.
 The remaining $N^2$ entries are the values of the flattened potential matrix at the given node.
 SPARSE assumes that the potential is flattened in row-major (C-style) order
@@ -74,7 +74,7 @@ Below is a dimensional analysis of the inputs.
 
 **Columns of potential.csv:**  
 (1) *r*: [Length]  
-(2, 3, ..., $N^2$) *V*: [Energy]  
+(2, 3, ..., $N^2 + 1$) *V*: [Energy]  
 
 The SPARSE algorithm uses natural units, in which $\hbar=c=1$ and therefore $[\text{Mass}]=[\text{Energy}]$ and $[\text{Length}]=[\text{Energy}]^{-1}$.
 There is only one independent dimension, typically chosen between [Length] in units of fm (femtometers) and [Energy] in units of eV (electron Volts).
