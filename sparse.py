@@ -74,11 +74,12 @@ scattering = threshold < np.inf
 # The limits are structured as a (2 + N, 2)-array where N is the number
 # of scattering channels. Each row of the array is a pair of values.
 # Energies within any such pair of values is excluded.
+# Overall lower and upper limits are set as (-inf, lower) and (upper, +inf).
 elims = np.empty((2 + np.count_nonzero(scattering), 2))
 
-# Overall lower and upper limits are set as (-inf, lower) and (upper, +inf).
 # The lower limit is the lowest finite threshold.
 elims[0] = (-np.inf, threshold.min())
+
 # Calculate the maximum momentum based on the discretization distance.
 # The number in the denominator should be bigger than 1.
 pmax = np.pi / (dr * 500)  # <- change "500" if needed
@@ -89,10 +90,6 @@ elims[1] = (np.concatenate(
     np.diagonal(pot[-1])[~scattering])).min(),
     np.inf)
 
-# Establish exclusion zones for energies close to finite thresholds.
-# Calculate the maximum binding momentum based on the maximum distance.
-# The number in the numerator should be bigger than 1.
-bound_p_max = 10 / r[-1]  # change "10" if needed
 # Calculate the radius of the potential for scattering channels.
 # The potential is considered 0 if its value is less than atol.
 pot_is_flat = np.all(
@@ -101,11 +98,16 @@ pot_is_flat = np.all(
         np.diagflat(threshold[scattering]),
         atol=1e-8),  # <- change "1e-8" if needed
     axis=(1,2))
+# The potential radius is defined as the largest value of r
+# for which the corresponding value of pot_is_flat is False.
 # Check that the potential radius is within the coordinate space.
 assert pot_is_flat[-1]
-# Calculate the potential radius, ensuring that it is at least r[0].
+# Assign False to the pot_is_flat[0] to ensure that
+# the potential radius is not smaller than r[0].
 pot_is_flat[0] = False
+# Calculate the potential radius.
 r_pot = r[~pot_is_flat][-1]
+
 # Calculate the minimum scattering momentum based on the potential radius
 # or the condition that the analytic scattering states are approximately
 # sine and cosine functions, whichever is smaller.
@@ -113,7 +115,12 @@ r_pot = r[~pot_is_flat][-1]
 free_p_min = np.maximum(
     np.pi / (r[-1] - r_pot),
     (10 * l[scattering] + np.pi) / r[-1])  # change "10" if needed
-# Exclude energies too close to threshold.
+
+# Calculate the maximum binding momentum based on the maximum distance.
+# The number in the numerator should be bigger than 1.
+bound_p_max = 10 / r[-1]  # change "10" if needed
+
+# Establish exclusion zones for energies too close to finite thresholds.
 elims[2:, 0] = threshold[scattering] \
     - bound_p_max ** 2 / (2 * mu[scattering])
 elims[2:, 1] = threshold[scattering] \

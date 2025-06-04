@@ -16,10 +16,6 @@ def potential_well(x):
     return (0.05 / x - 100) * np.exp(- (100 * x) ** 2)
 
 
-def linear_potential(x):
-    return 5e03 * x
-
-
 def coupling(x):
     return 50 * (100 * x) ** 2 * np.exp(- (100 * x) ** 2)
 
