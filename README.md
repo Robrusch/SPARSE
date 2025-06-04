@@ -9,7 +9,7 @@ $\psi(r)=(\psi_1(r),\psi_2(r),\dots,\psi_N(r))$ is a wave function with N channe
 $\mu = \mathrm{diag}(\mu_1, \mu_2, \dots, \mu_N)$ is a diagonal reduced-mass matrix,
 $L=\mathrm{diag}(L_1, L_2, \dots, L_N)$ is a diagonal orbital-angular-momentum matrix,
 and $V(r)$ is a $N \times N$ potential matrix with both diagonal and off-diagonal entries that depends on $r$.
-Note that we use natural units: $\hbar=c=1$.
+Note that we used natural units in which $\hbar=c=1$.
 
 We define the threshold matrix as the limit of the potential matrix for $r\to\infty$: $T=\lim_{r\to\infty}V(r)$.
 This module focuses on cases where all limits are well defined,
@@ -61,6 +61,25 @@ r2, V11(r2), V12(r2), ..., V1N(r2), V21(r2), V22(r2), ..., V2N(r2), ..., VN1(r2)
 ...  
 rM, V11(rM), V12(rM), ..., V1N(rM), V21(rM), V22(rM), ..., V2N(rM), ..., VN1(rN), VN2(rN), ..., VNN(rM)  
 EOF
+
+### An important note about units
+
+Below is a dimensional analysis of the inputs.
+
+**Channels**  
+*name*: N/A (it is a string)  
+*l*: dimensionless (integer)
+*threshold*: [Energy]  
+*mu*: [Mass]  
+
+**Potential**
+*r*: [Length]  
+*V*: [Energy]  
+
+The SPARSE algorithm uses natural units, in which $\hbar=c=1$ and therefore $[\text{Energy}]=[\text{Mass}]$ and $[\text{Length}]=[\text{Energy}]^{-1}$.
+There is only one independent dimension, typically chosen between [Length] in units of fm (femtometer) and [Energy] in units of MeV or GeV (Mega- or Giga- electron Volts).
+The SPARSE algorithm is agnostic to such choice of dimension/unit.
+The conversion between the two is easily achieved by means of the formula $\hbar c = 197.3 \text{MeV} \text{fm} = 1$.
 
 ## Repository structure
 
