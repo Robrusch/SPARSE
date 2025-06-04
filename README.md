@@ -68,7 +68,7 @@ Below is a dimensional analysis of the inputs.
 
 **Channels**  
 *name*: N/A (it is a string)  
-*l*: dimensionless (integer)
+*l*: dimensionless (integer)  
 *threshold*: [Energy]  
 *mu*: [Mass]  
 
