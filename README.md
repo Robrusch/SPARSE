@@ -72,7 +72,7 @@ Below is a dimensional analysis of the inputs.
 *threshold*: [Energy]  
 *mu*: [Mass]  
 
-**Potential**
+**Potential**  
 *r*: [Length]  
 *V*: [Energy]  
 
