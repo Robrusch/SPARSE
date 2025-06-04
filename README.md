@@ -66,13 +66,13 @@ EOF
 
 Below is a dimensional analysis of the inputs.
 
-**Channels**  
+**channels.csv**  
 *name*: N/A (it is a string)  
 *l*: dimensionless (it is an integer)  
 *threshold*: [Energy]  
 *mu*: [Mass]  
 
-**Potential**  
+**potential.csv**  
 *r*: [Length]  
 *V*: [Energy]  
 
