@@ -32,7 +32,7 @@ channels = pd.DataFrame(
     )
 
 max_radius = 1.
-mesh_points = int(1e6) + 2
+mesh_points = int(1e6) + 1
 r = np.linspace(0, max_radius, mesh_points)[1:-1]
 pot = np.empty((len(r), len(channels), len(channels)))
 pot[:, 0, 0] = thresholds[0] + potential_well(r)
