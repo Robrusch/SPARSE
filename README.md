@@ -76,4 +76,4 @@ The SPARSE repository contains the following files:
 
 *requirements.txt*: list of package requirements for the SPARSE module and its utility functions.
 
-*LICENSE.txt*: MIT license.
+*LICENSE.txt*: MIT license and copyright notice
