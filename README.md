@@ -79,7 +79,7 @@ Below is a dimensional analysis of the inputs.
 The SPARSE algorithm uses natural units, in which $\hbar=c=1$ and therefore $[\text{Mass}]=[\text{Energy}]$ and $[\text{Length}]=[\text{Energy}]^{-1}$.
 There is only one independent dimension, typically chosen between [Length] in units of fm (femtometers) and [Energy] in units of eV (electron Volts).
 The SPARSE algorithm is agnostic to the user's choice of dimension/unit, as long as it is consistent with the prescription $\hbar=c=1$.
-The conversion between length-based and energy-based unis is easily achieved by means of the formula $\hbar c = 1 = 197.3$ MeV fm.
+The conversion between length-based and energy-based units is easily achieved by means of the formula $\hbar c = 1 = 197.3$ MeV fm.
 
 ## Repository structure
 
