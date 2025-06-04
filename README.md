@@ -72,6 +72,6 @@ The SPARSE repository contains the following files:
 
 *requirements.txt*: list of package requirements for the SPARSE module and its utility functions.
 
-*example_potential.py*: a Python script that automatically calculates an example potential matrix and writes it into CSV files compatible with SPARSE.
+*example-potential.py*: a Python script that automatically calculates an example potential matrix and writes it into CSV files compatible with SPARSE.
 
 *SPARSE-tutorial.ipynb*: an IPython notebook tutorial for SPARSE, check it out!
