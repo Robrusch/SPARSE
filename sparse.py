@@ -254,6 +254,10 @@ def bound_states(n_states, energy_guess):
         eigenvalues = eigenvalues[~above]
         eigenvectors = eigenvectors[..., ~above]
         n_states -= sum(above)
+        if n_states == 0:
+            warnings.warn(
+                'No bound states found',
+                RuntimeWarning, stacklevel=2)
     if any(eigenvalues > min(elims[1:, 0])):
         warnings.warn(f'States above {min(elims[1:, 0])} may be distorted',
                       RuntimeWarning, stacklevel=2)
