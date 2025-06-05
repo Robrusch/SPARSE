@@ -54,21 +54,21 @@ pot = potential.to_numpy().reshape(m, n, n)
 # See the documentation of scipy.linalg.solve_banded for more information.
 hamiltonian = np.empty((2 * n + 1, n * m))
 # Calculate the main diagonal.
-hamiltonian[n] = np.tile(1 / (mu * dr ** 2), m) \
-    + np.outer(r ** -2, l * (l + 1) / (2 * mu)).flatten() \
-        + pot.diagonal(0, 1, 2).flatten()
+kinetic_main_diag = np.tile(1 / (mu * dr ** 2), m)
+centrifugal_diag = np.outer(r ** -2, l * (l + 1) / (2 * mu)).flatten()
+pot_main_diag = pot.diagonal(0, 1, 2).flatten()
+hamiltonian[n] = kinetic_main_diag + centrifugal_diag + pot_main_diag
 # Calculate the upper and lower diagonals.
 for k in range(1, n):
     upp_diags = pot.diagonal(k, 1, 2)
     low_diags = pot.diagonal(-k, 1, 2)
-    pad_upp_diags = np.pad(upp_diags, ((0,0), (k, 0)))
-    pad_low_diags = np.pad(low_diags, ((0,0), (0, k)))
-    hamiltonian[n - k] = pad_upp_diags.flatten()
-    hamiltonian[n + k] = pad_low_diags.flatten()
+    hamiltonian[n - k] = np.pad(upp_diags, ((0,0), (k, 0))).flatten()
+    hamiltonian[n + k] = np.pad(low_diags, ((0,0), (0, k))).flatten()
 # The kinetic energy matrix has only three nonzero diagonals.
 # They add to the Hamiltonian's uppermost, central, and lowermost diagonals.
-hamiltonian[0] = np.pad(np.tile(-1 / (2 * mu * dr ** 2), m - 1), (n, 0))
-hamiltonian[-1] = np.pad(np.tile(-1 / (2 * mu * dr ** 2), m - 1), (0, n))
+kinetic_off_diag = np.tile(-1 / (2 * mu * dr ** 2), m - 1)
+hamiltonian[0] = np.pad(kinetic_off_diag, (n, 0))
+hamiltonian[-1] = np.pad(kinetic_off_diag, (0, n))
 
 # Establish the scattering channels as those with a finite threshold.
 scattering = threshold < np.inf
