@@ -242,7 +242,7 @@ def bound_states(n_states, energy_guess):
 
     """
     e_bound_max = min(emin, emax)
-    if energy_guess < e_bound_max:
+    if energy_guess > e_bound_max:
         raise ValueError('Invalid energy guess.')
     offsets = np.arange(n, -n - 1, -1)
     hb = dia_array((hamiltonian, offsets), shape=(n * m, n * m))
