@@ -8,7 +8,7 @@ where $r$ is the relative distance between the two degrees of freedom,
 $u(r)=(u_1(r),u_2(r),\dots,u_N(r))$ is a reduced radial wave function with N channels,
 $\mu = \mathrm{diag}(\mu_1, \mu_2, \dots, \mu_N)$ is a diagonal reduced-mass matrix,
 $L=\mathrm{diag}(L_1, L_2, \dots, L_N)$ is a diagonal orbital-angular-momentum matrix,
-and $V(r)$ is a $N \times N$ potential matrix with both diagonal and off-diagonal entries that depends on $r$.
+and $V(r)$ is a $N \times N$ potential matrix with both diagonal and off-diagonal elements that depends on $r$.
 Note that we used natural units in which $\hbar=c=1$.
 
 We define the threshold matrix as the limit of the potential matrix for $r\to\infty$: $T=\lim_{r\to\infty}V(r)$.
@@ -17,8 +17,8 @@ the threshold matrix is diagonal, $T=\mathrm{diag}(T_1,T_2,\dots,T_N)$, and each
 The Schrödinger equation then admits scattering solutions for energies larger than the lowest threshold, $E \geq \min T$.
 
 SPARSE solves the Schrödinger equation numerically using the finite difference method by sampling the continuous distance $r$ on a discrete
-lattice of point separated by a constant distance $\mathrm{d}r$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
-$r_i=i ~ \mathrm{d}r$ with $i=1,\dots,M$, and ends at $r_\text{max}=(M+1) \mathrm{d}r$.
+lattice of point separated by a constant distance $h$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
+$r_i=i ~ \mathrm{d}r$ with $i=1,\dots,M$, and ends at $r_\text{max}=(M+1) h$.
 The wave function $\psi$ with N channels is treated as a numerical array containing its values at each of the M interior nodes of $r$.
 (The boundary points are treated in a different manner.)
 It is an array with $N \times M$ entries. Similarly, the potential matrix $V$ is treated as an array with $N \times N \times M$ entries, corresponding to
