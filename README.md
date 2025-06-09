@@ -19,10 +19,10 @@ The Schrödinger equation then admits scattering solutions for energies larger t
 SPARSE solves the Schrödinger equation numerically using the finite difference method by sampling the continuous distance $r$ on a discrete
 lattice of point separated by a constant distance $h$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
 $r_n=n h$ with $n=1,\dots,M$, and ends at $r_\text{max}=(M+1) h$.
-The reduced radial wave function $u(r)$ with N channels is treated as a numerical array containing its values at each of the M interior nodes of $r$.
+The reduced radial wave function $u(r)$ with N channels is treated as a numerical array containing its values at each of the M nodes in the interior of $r$.
 (The boundary points are treated in a different manner.)
 It is an array with $N \times M$ entries. Similarly, the potential matrix $V$ is treated as an array with $N \times N \times M$ entries, corresponding to
-each entry of the potential matrix evaluated at each interal node.
+each potential matrix element evaluated at each node in the interior of $r$.
 
 ## Setup
 
@@ -32,11 +32,11 @@ The numerical Schrödinger equation is completely specified by 4 quantities:
 3. the channels' reduced masses;
 4. the numerical potential matrix.
 
-The channels' specifics (name, orbital angular momenta, thresholds, reduced masses) must be stored in a CSV with 1 line of header and $N$ additional lines below.
+The channels' specifics (name, orbital angular momenta, thresholds, reduced masses) must be stored in a CSV file with 1 line of header and $N$ additional lines below.
 Each line must contain 4 entries.
 The header must contain the following strings: channel, l, threshold, mu.
 The following lines must contain the corresponding values.
-The ordering of the columns is irrelevant, but must obviously be consistent with the tabular format.
+The ordering of the columns is irrelevant, but it must obviously be consistent between rows.
 The typical structure of the channels' CSV file is therefore:
 
 BOF  
@@ -47,7 +47,7 @@ Name2, l2, T2, mu2,
 NameN, lN, TN, muN  
 EOF  
 
-The nodes positions and the numerical potential must be stored in a CSV file with $M$ lines and **NO header**.
+The positions of the nodes the values of the numerical potential must be stored in a CSV file with $M$ lines and **NO header**.
 Each line must contain $N^2 + 1$ entries.
 The first entry is the node value $r$.
 The remaining $N^2$ entries are the values of the flattened potential matrix at the given node.
