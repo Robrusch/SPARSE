@@ -2,10 +2,10 @@
 
 This algorithm calculates scattering amplitudes from a two-body, multi-channel, radial Schrödinger equation in the form:
 
-$$\left(-\frac{1}{2 \mu} \frac{\mathrm{d}^2}{\mathrm{d}r^2} + \frac{L (L + 1)}{2 \mu r^2} + V(r) \right) u(r) = E u(r)$$
+$$\left(-\frac{1}{2 \mu} \frac{\mathrm{d}^2}{\mathrm{d}r^2} + \frac{L (L + 1)}{2 \mu r^2} + V(r) - E \right) u(r) = 0$$
 
 where $r$ is the relative distance between the two degrees of freedom,
-$u(r)=(u_1(r),u_2(r),\dots,u_N(r))$ is a reduced wave function with N channels,
+$u(r)=(u_1(r),u_2(r),\dots,u_N(r))$ is a reduced radial wave function with N channels,
 $\mu = \mathrm{diag}(\mu_1, \mu_2, \dots, \mu_N)$ is a diagonal reduced-mass matrix,
 $L=\mathrm{diag}(L_1, L_2, \dots, L_N)$ is a diagonal orbital-angular-momentum matrix,
 and $V(r)$ is a $N \times N$ potential matrix with both diagonal and off-diagonal entries that depends on $r$.
