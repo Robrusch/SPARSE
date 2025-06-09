@@ -18,7 +18,7 @@ The Schrödinger equation then admits scattering solutions for energies larger t
 
 SPARSE solves the Schrödinger equation numerically using the finite difference method by sampling the continuous distance $r$ on a discrete
 lattice of point separated by a constant distance $h$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
-$r_i=i ~ \mathrm{d}r$ with $i=1,\dots,M$, and ends at $r_\text{max}=(M+1) h$.
+$r_i=i h$ with $i=1,\dots,M$, and ends at $r_\text{max}=(M+1) h$.
 The wave function $\psi$ with N channels is treated as a numerical array containing its values at each of the M interior nodes of $r$.
 (The boundary points are treated in a different manner.)
 It is an array with $N \times M$ entries. Similarly, the potential matrix $V$ is treated as an array with $N \times N \times M$ entries, corresponding to
