@@ -17,8 +17,8 @@ the threshold matrix is diagonal, $T=\mathrm{diag}(T_1,T_2,\dots,T_N)$, and each
 The Schrödinger equation then admits scattering solutions for energies larger than the lowest threshold, $E \geq \min T$.
 
 SPARSE solves the Schrödinger equation numerically using the finite difference method by sampling the continuous distance $r$ on a discrete
-lattice of point separated by a constant distance $h$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
-$r_n=n h$ with $n=1,\dots,M$, and ends at $r_\text{max}=(M+1) h$.
+lattice of point separated by a constant distance $d$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
+$r_n=n d$ with $n=1,\dots,M$, and ends at $r_\text{max}=(M+1) d$.
 The reduced radial wave function $u(r)$ with N channels is treated as a numerical array containing its values at each of the M nodes in the interior of $r$.
 (The boundary points are treated in a different manner.)
 It is an array with $N \times M$ entries. Similarly, the potential matrix $V$ is treated as an array with $N \times N \times M$ entries, corresponding to
