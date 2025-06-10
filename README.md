@@ -41,8 +41,8 @@ The typical structure of the channels' CSV file is therefore:
 
 BOF  
 channel, l, threshold, mu  
-Name1, l1, T1, mu1,  
-Name2, l2, T2, mu2,  
+Name1, l1, T1, mu1  
+Name2, l2, T2, mu2  
 ...  
 NameN, lN, TN, muN  
 EOF  
