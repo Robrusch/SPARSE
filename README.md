@@ -33,19 +33,24 @@ The numerical Schrödinger equation is completely specified by 4 quantities:
 4. the numerical potential matrix.
 
 The channels' specifics (name, orbital angular momenta, thresholds, reduced masses) must be stored in a CSV file with 1 line of header and $N$ additional lines below.
-Each line must contain 4 entries.
-The header must contain the following strings: channel, l, threshold, mu.
-The following lines must contain the corresponding values.
+Each line must contain at least 4 entries.
+The header must contain at least the following strings: channel, l, threshold, mu.
+The following lines must contain at least the corresponding values.
 The ordering of the columns is irrelevant, but it must obviously be consistent between rows.
-The typical structure of the channels' CSV file is therefore:
+The typical structure of a minimal channels' CSV file is therefore:
 
 BOF  
-channel, l, threshold, mu  
-Name1, l1, T1, mu1  
-Name2, l2, T2, mu2  
+l, threshold, mu  
+l1, T1, mu1  
+l2, T2, mu2  
 ...  
-NameN, lN, TN, muN  
-EOF  
+lN, TN, muN  
+EOF
+
+For the user's convenience, additional information about the channels may be specified by adding more columns.
+For instance, the user may want to include a column named "s" indicating the spin for each channel,
+or a column named "channel" providing a label for each channel that is more informative than just an integer.
+Such additional columns will be read by SPARSE but will not play any role in the calculations.
 
 The positions of the nodes the values of the numerical potential must be stored in a CSV file with $M$ lines and **NO header**.
 Each line must contain $N^2 + 1$ entries.
