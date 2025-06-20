@@ -13,40 +13,99 @@ from scipy.integrate import trapezoid
 from scipy.sparse import dia_array
 from scipy.sparse.linalg import eigsh
 
-# Import potential metadata from file: channels.csv
+# Import channel description from file: channels.csv
 channels = pd.read_csv('channels.csv',
-                       usecols=['channel', 'l', 'threshold', 'mu'],
                        dtype={
-                           'channel': str,
                            'l': np.int64,
                            'threshold': np.float64,
                            'mu': np.float64,
                            })
 channels.rename(index=lambda x: x + 1, inplace=True)
 
-# Import potential matrix from file: potential.csv
+# Import coordinate space and potential matrix from file: potential.csv
 potential = pd.read_csv('potential.csv',
                         index_col=0,
                         names=pd.MultiIndex.from_product(2 * [channels.index]),
                         dtype=np.float64)
 potential.columns.set_names(['row', 'column'], inplace=True)
 
-# Set up global variables from potential metadata.
+# Set up global variables from channel description
+for val in ['l', 'threshold', 'mu']:
+    assert val in channels.columns, f'Missing column "{val}" in channels.'
 l = channels.l.to_numpy()
 threshold = channels.threshold.to_numpy()
 mu = channels.mu.to_numpy()
-r = potential.index.to_numpy()
-
-# Check that the coordinates are positive, equally spaced, and start from 0.
-dr = r[0]
-assert dr > 0 and np.allclose(np.diff(r), dr), \
-    'Malformed coordinate space, check your input potential.'
 
 # Reshape the potential.
-# Will result in an error if input potential is misshaped.
 n = len(channels)
-m = len(potential)
+m, nsquared = potential.shape
+assert nsquared == n ** 2, 'Shape mismatch between channels and potential. ' \
+    f'Number of channels squared ({n **2}) does not coincide with ' \
+        f'length of flattened potential matrix ({nsquared}).'
 pot = potential.to_numpy().reshape(m, n, n)
+
+# Set up the coordinate space.
+r = potential.index.to_numpy()
+dr = r[0]
+assert dr > 0 and np.allclose(np.diff(r), dr), \
+    'Malformed coordinate space, check your potential.'
+r_space = np.insert(r, [0, m], [0, r[-1] + dr])
+
+# Establish the scattering channels as those with a finite threshold.
+scattering = threshold < np.inf
+
+# Set overall lower and upper energy limits.
+# The lower limit is the lowest finite threshold.
+emin = threshold.min()
+# Calculate the maximum momentum based on the discretization distance.
+pmax = np.pi / dr
+# The upper limit is dictated by the maximum scattering momentum or
+# the potentials for non-scattering channels, whichever is smaller.
+emax_scattering = pmax**2 / (2 * mu[scattering]) + threshold[scattering]
+emax_bound = pot[-1].diagonal()[~scattering]
+emax = np.concatenate((emax_scattering, emax_bound)).min()
+
+# Establish exclusion zones for energies too close to finite thresholds.
+# The limits consist of a pair of energies for each scattering channel.
+# Energies within any such pair of values is excluded.
+elims = np.empty((2, np.count_nonzero(scattering)))
+
+# Energies below threshold are limited by the maximum binding momentum.
+# Calculate the minimum binding momentum based on the maximum distance.
+# The first number in the numerator should be bigger than 1.
+bound_p_min = 10 / r_space[-1]  # <- may change "10"
+elims[0] = threshold[scattering] \
+    - bound_p_min ** 2 / (2 * mu[scattering])
+
+# Energies above threshold are limited by the minimum scattering momentum.
+# Calculate the radius of the potential for scattering channels.
+# The difference between the potential and threshold matrices is considered
+# zero if its value is less than atol.
+pot_scattering = pot[np.ix_(range(m), scattering, scattering)]
+pot_zero_ref = np.diag(threshold[scattering])
+pot_is_zero = np.isclose(pot_scattering, pot_zero_ref,
+                         atol=1e-8).all(axis=(1,2))  # <- may change atol
+# The potential radius is defined as the largest value of r
+# for which the corresponding value of pot_is_flat is False.
+# Check that the potential radius is within the coordinate space.
+assert pot_is_zero[-1], \
+    'Potential matrix at maximum radius is significantly different from' \
+        'threshold matrix, check your channels and potential.'
+# Calculate the potential radius.
+if all(pot_is_zero):
+    r_pot = 0
+else:
+    r_pot = r[~pot_is_zero][-1]
+# Calculate the minimum scattering momentum based on the potential radius.
+free_p_min_pot = np.pi / (r_space[-1] - r_pot)
+# Calculate the minimum scattering momentum from the condition that the
+# analytic scattering states are approximately sine and cosine functions.
+# The number in the numerator should be bigger than 1.
+free_p_min_l = (10 * l[scattering] + np.pi) / r_space[-1] # <- may change "10"
+# The minimum scattering momentum is the largest between those two.
+free_p_min = np.maximum(free_p_min_pot, free_p_min_l)
+elims[1] = threshold[scattering] \
+    + free_p_min ** 2 / (2 * mu[scattering])
 
 # Calculate the sparse Hamiltonian matrix.
 # The Hamiltonian matrix is a real, square matrix of dimension (n * m)^2.
@@ -71,59 +130,6 @@ kinetic_off_diag = np.tile(-1 / (2 * mu * dr ** 2), m - 1)
 hamiltonian[0] = np.pad(kinetic_off_diag, (n, 0))
 hamiltonian[-1] = np.pad(kinetic_off_diag, (0, n))
 
-# Establish the scattering channels as those with a finite threshold.
-scattering = threshold < np.inf
-
-# Set overall lower and upper energy limits.
-# The lower limit is the lowest finite threshold.
-emin = threshold.min()
-# Calculate the maximum momentum based on the discretization distance.
-pmax = np.pi / dr
-# The upper limit is dictated by the maximum scattering momentum or
-# the potentials for non-scattering channels, whichever is smaller.
-emax_scattering = pmax**2 / (2 * mu[scattering]) + threshold[scattering]
-emax_bound = pot[-1].diagonal()[~scattering]
-emax = np.concatenate((emax_scattering, emax_bound)).min()
-
-
-# Establish exclusion zones for energies too close to finite thresholds.
-# The limits consist of a pair of energies for each scattering channel.
-# Energies within any such pair of values is excluded.
-elims = np.empty((2, np.count_nonzero(scattering)))
-# Energies below threshold are limited by the maximum binding momentum.
-# Calculate the minimum binding momentum based on the maximum distance.
-# The first number in the numerator should be bigger than 1.
-bound_p_min = 10 / r[-1]  # <- may change "10"
-# Energies above threshold are limited by the minimum scattering momentum.
-# Calculate the radius of the potential for scattering channels.
-# The potential is considered 0 if its value is less than atol.
-pot_scattering = pot[np.ix_(range(m), scattering, scattering)]
-pot_zero_ref = np.diag(threshold[scattering])
-pot_is_zero = np.isclose(pot_scattering, pot_zero_ref,
-                         atol=1e-8).all(axis=(1,2))  # <- may change atol
-# The potential radius is defined as the largest value of r
-# for which the corresponding value of pot_is_flat is False.
-# Check that the potential radius is within the coordinate space.
-assert pot_is_zero[-1], \
-    'Potential matrix at maximum radius is significantly different from' \
-        'threshold matrix, check your input channels and potential.'
-# Assign False to the pot_is_flat[0] to ensure that
-# the potential radius is not smaller than r[0].
-pot_is_zero[0] = False
-# Calculate the potential radius.
-r_pot = r[~pot_is_zero][-1]
-# Calculate the minimum scattering momentum based on the potential radius.
-free_p_min_pot = np.pi / (r[-1] - r_pot)
-# Calculate the minimum scattering momentum from the condition that the
-# analytic scattering states are approximately sine and cosine functions.
-# The number in the numerator should be bigger than 1.
-free_p_min_l = (10 * l[scattering] + np.pi) / r[-1] # <- may change "10"
-# The minimum scattering momentum is the largest between those two.
-free_p_min = np.maximum(free_p_min_pot, free_p_min_l)
-elims[0] = threshold[scattering] \
-    - bound_p_min ** 2 / (2 * mu[scattering])
-elims[1] = threshold[scattering] \
-    + free_p_min ** 2 / (2 * mu[scattering])
 
 def k_matrix(energy, rtol=1e-2):
     """
@@ -154,23 +160,25 @@ def k_matrix(energy, rtol=1e-2):
     ab = hamiltonian.copy()
     ab[n] -= energy
     b = np.zeros((n * m, o))
-    b[-n:][is_open] = np.diag(1 / (2 * mu_open * dr ** 2))
-    vec = solve_banded((n, n), ab, b, overwrite_ab=True,
+    boundary = np.eye(o)
+    b[-n:][is_open] = boundary / (2 * mu_open[:, np.newaxis] * dr ** 2)
+    sol = solve_banded((n, n), ab, b, overwrite_ab=True,
                        overwrite_b=True, check_finite=False)
-    sol = vec.reshape(m, n, o)[:, is_open]
+    vec = sol.reshape(m, n, o)[:, is_open]
+    wavefuncs = np.insert(vec, [0, m], [np.zeros((o, o)), boundary], axis=0)
     b = np.empty((o, o))
     a = np.empty_like(b)
     for i in range(o):
         dx = dr * p[i]
         j = (np.pi / dx).round().astype(int) + 1
-        x = r[-j:] * p[i] - l_open[i] * np.pi / 2
-        y = sol[-j:, i].T
-        normfactor = np.sqrt(p[i] / mu_open[i])
-        a[i] = trapezoid(y * np.sin(x), dx=dx) * normfactor
-        b[i] = trapezoid(y * np.cos(x), dx=dx) * normfactor
-    kmatrix_raw = b @ inv(a, overwrite_a=True, check_finite=False)
-    kmatrix = (kmatrix_raw + kmatrix_raw.T) / 2
-    if not np.allclose(kmatrix_raw, kmatrix, rtol=rtol):
+        x = r_space[-j:] * p[i] - l_open[i] * np.pi / 2
+        y = wavefuncs[-j:, i].T
+        v = np.sqrt(p[i] / mu_open[i])
+        a[i] = v * trapezoid(y * np.sin(x), dx=dx)
+        b[i] = v * trapezoid(y * np.cos(x), dx=dx)
+    kmatrix_asym = b @ inv(a, overwrite_a=True, check_finite=False)
+    kmatrix = (kmatrix_asym + kmatrix_asym.T) / 2
+    if not np.allclose(kmatrix_asym, kmatrix, rtol=rtol):
         warnings.warn(
             'Asymmetry tolerance exceeded.',
             RuntimeWarning, stacklevel=2)
@@ -270,11 +278,10 @@ def bound_states(n_states, energy_guess):
             warnings.warn(f'States above {elims[0].min()} may be distorted',
                           RuntimeWarning, stacklevel=2)
     norm_vec = eigenvectors.reshape(m, n, n_states) / np.sqrt(dr)
-    r_closure = np.insert(r, [0, m], [0, r[-1] + dr])
     wavefuncs = np.insert(norm_vec, [0, m], 0, axis=0)
     wave_functions = np.empty(n_states, dtype=object)
     for i in range(n_states):
         wave_functions[i] = pd.DataFrame(wavefuncs[..., i],
-                                         index=r_closure,
+                                         index=r_space,
                                          columns=channels.index)
     return eigenvalues, wave_functions
