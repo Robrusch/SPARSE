@@ -72,10 +72,9 @@ EOF
 Below is a dimensional analysis of the inputs.
 
 **Columns of channels.csv:**  
-(1) *name*: N/A (it is a string)  
-(2) *l*: dimensionless (it is an integer)  
-(3) *threshold*: [Energy]  
-(4) *mu*: [Mass]  
+(1) *l*: dimensionless (it is an integer)  
+(2) *threshold*: [Energy]  
+(3) *mu*: [Mass]  
 
 **Columns of potential.csv:**  
 (1) *r*: [Length]  
