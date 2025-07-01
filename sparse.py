@@ -67,7 +67,7 @@ emax = np.concatenate((emax_scattering, emax_bound)).min()
 
 # Establish exclusion zones for energies too close to finite thresholds.
 # The limits consist of a pair of energies for each scattering channel.
-# Energies within any such pair of values is excluded.
+# Energies within any such pair of values are excluded.
 elims = np.empty((2, np.count_nonzero(scattering)))
 
 # Energies below threshold are limited by the maximum binding momentum.
@@ -81,21 +81,23 @@ elims[0] = threshold[scattering] \
 # Calculate the radius of the potential for scattering channels.
 # The difference between the potential and threshold matrices is considered
 # zero if its value is less than atol.
-pot_scattering = pot[np.ix_(range(m), scattering, scattering)]
-pot_zero_ref = np.diag(threshold[scattering])
-pot_is_zero = np.isclose(pot_scattering, pot_zero_ref,
-                         atol=1e-8).all(axis=(1,2))  # <- may change atol
+thresh = np.diag(threshold)
+pot_are_thresh = np.isclose(pot, thresh, atol=1e-8)  # <- may change atol
+# Exclude diagonal elements for confining channels with infinite thresholds
+# by setting the corresponding elements of pot_are_thresh to True.
+pot_are_thresh[:, ~scattering, ~scattering] = True
+pot_is_thresh = pot_are_thresh.all(axis=(1,2))
 # The potential radius is defined as the largest value of r
-# for which the corresponding value of pot_is_flat is False.
+# for which the corresponding value of pot_is_thresh is False.
 # Check that the potential radius is within the coordinate space.
-assert pot_is_zero[-1], \
+assert pot_is_thresh[-1], \
     'Potential matrix at maximum radius is significantly different from' \
         'threshold matrix, check your channels and potential.'
 # Calculate the potential radius.
-if all(pot_is_zero):
+if all(pot_is_thresh):
     r_pot = 0
 else:
-    r_pot = r[~pot_is_zero][-1]
+    r_pot = r[~pot_is_thresh][-1]
 # Calculate the minimum scattering momentum based on the potential radius.
 free_p_min_pot = np.pi / (r_space[-1] - r_pot)
 # Calculate the minimum scattering momentum from the condition that the
@@ -124,8 +126,6 @@ for k in range(1, n):
     low_diags = pot.diagonal(-k, 1, 2)
     hamiltonian[n - k] = np.pad(upp_diags, ((0,0), (k, 0))).flatten()
     hamiltonian[n + k] = np.pad(low_diags, ((0,0), (0, k))).flatten()
-# The kinetic energy matrix has only three nonzero diagonals.
-# They add to the Hamiltonian's uppermost, central, and lowermost diagonals.
 kinetic_off_diag = np.tile(-1 / (2 * mu * dr ** 2), m - 1)
 hamiltonian[0] = np.pad(kinetic_off_diag, (n, 0))
 hamiltonian[-1] = np.pad(kinetic_off_diag, (0, n))
@@ -180,7 +180,7 @@ def k_matrix(energy, rtol=1e-2):
     kmatrix = (kmatrix_asym + kmatrix_asym.T) / 2
     if not np.allclose(kmatrix_asym, kmatrix, rtol=rtol):
         warnings.warn(
-            'Asymmetry tolerance exceeded.',
+            f'Asymmetry tolerance exceeded for E={energy}.',
             RuntimeWarning, stacklevel=2)
     return kmatrix
 

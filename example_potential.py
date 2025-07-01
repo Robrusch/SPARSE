@@ -2,7 +2,7 @@
 """
 Created on Fri May 30 11:47:09 2025
 
-@author: bruschini.1
+@author: Roberto Bruschini
 """
 
 # Create two example potentials and store them in the correct file format
@@ -10,14 +10,6 @@ Created on Fri May 30 11:47:09 2025
 
 import numpy as np
 import pandas as pd
-
-
-def potential_well(x):
-    return (0.05 / x - 100) * np.exp(- (100 * x) ** 2)
-
-
-def coupling(x):
-    return 50 * (100 * x) ** 2 * np.exp(- (100 * x) ** 2)
 
 
 names = ['Lower (P-wave)', 'Higher (S-wave)']
@@ -35,6 +27,16 @@ max_radius = 1.
 mesh_points = int(1e6) + 1
 r = np.linspace(0, max_radius, mesh_points)[1:-1]
 pot = np.empty((len(r), len(channels), len(channels)))
+
+
+def potential_well(x):
+    return (0.05 / x - 100) * np.exp(- (100 * x) ** 2)
+
+
+def coupling(x):
+    return 50 * (100 * x) ** 2 * np.exp(- (100 * x) ** 2)
+
+
 pot[:, 0, 0] = thresholds[0] + potential_well(r)
 pot[:, 1, 1] = thresholds[1] + potential_well(r)
 pot[:, 0, 1] = coupling(r)

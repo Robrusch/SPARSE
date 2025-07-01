@@ -71,14 +71,13 @@ def amplitudes(k_matrix_df):
         Matrix elements corresponding to closed channels are set to NaN.
 
     """
-    amplitudes = np.empty(k_matrix_df.shape, dtype=np.complex128)
+    amplitudes = np.full(k_matrix_df.shape, np.nan + 1j * np.nan)
     for i, kmat in enumerate(k_matrix_df.to_numpy()):
         kflat = kmat[~np.isnan(kmat)]
         n = int(np.sqrt(len(kflat)))
         k = kflat.reshape(n, n)
         t = k @ inv(np.eye(n) - 1j * k, overwrite_a=True, check_finite=False)
         amplitudes[i, ~np.isnan(kmat)] = t.flatten()
-        amplitudes[i, np.isnan(kmat)] = np.nan + 1j * np.nan
     return pd.DataFrame(amplitudes,
                         index=k_matrix_df.index,
                         columns=k_matrix_df.columns)
