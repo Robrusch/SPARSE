@@ -16,11 +16,10 @@ This module focuses on cases where all limits are well defined,
 the threshold matrix is diagonal, $T=\mathrm{diag}(T_1,T_2,\dots,T_N)$, and each threshold is either a finite number or $+\infty$.
 The Schrödinger equation then admits scattering solutions for energies larger than the lowest threshold, $E \geq \min T$.
 
-SPARSE solves the Schrödinger equation numerically using the finite difference method by sampling the continuous distance $r$ on a discrete
-lattice of point separated by a constant distance $d$. The lattice begins at $r_\text{min}=0$, contains $M$ equally-spaced points in its interior
+SPARSE solves the Schrödinger equation numerically using the finite difference method by sampling the continuous distance $r$ on a
+grid of equally-spaced points. The grid begins at $r_\text{min}=0$, contains $M$ nodes separated by a constant distance $d$ in its interior
 $r_n=n d$ with $n=1,\dots,M$, and ends at $r_\text{max}=(M+1) d$.
 The reduced radial wave function $u(r)$ with N channels is treated as a numerical array containing its values at each of the M nodes in the interior of $r$.
-(The boundary points are treated in a different manner.)
 It is an array with $N \times M$ entries. Similarly, the potential matrix $V$ is treated as an array with $N \times N \times M$ entries, corresponding to
 each potential matrix element evaluated at each node in the interior of $r$.
 
@@ -32,10 +31,14 @@ The numerical Schrödinger equation is completely specified by 4 quantities:
 3. the channels' reduced masses;
 4. the numerical potential matrix.
 
-The channels' specifics (name, orbital angular momenta, thresholds, reduced masses) must be stored in a CSV file with 1 line of header and $N$ additional lines below.
-Each line must contain at least 4 entries.
-The header must contain at least the following strings: channel, l, threshold, mu.
-The following lines must contain at least the corresponding values.
+The channels' specifics (orbital angular momenta, thresholds, reduced masses) must be stored in a CSV file with 1 line for the header followed by $N$ lines for the values.
+Each line must contain at least 3 entries.
+The header must contain at least the following strings: "l", "mu", and "threshold".
+The following $N$ lines must contain at least the corresponding values for the channels $i=1,\dots,N$.
+An entry under "l" is an integer indicating the orbital angular momentum.
+An entry under "mu" is a decimal number indicating the reduced mass.
+An entry under "threshold" is a decimal number indicating a finite threshold
+or the string "inf" if the potential is confining.
 The ordering of the columns is irrelevant, but it must obviously be consistent between rows.
 The typical structure of a minimal channels' CSV file is therefore:
 
@@ -48,12 +51,11 @@ lN, TN, muN
 EOF
 
 For the user's convenience, additional information about the channels may be specified by adding more columns.
-For instance, the user may want to include a column named "s" indicating the spin for each channel,
-or a column named "channel" providing a label for each channel that is more informative than just an integer.
-Such additional columns will be read by SPARSE but will not play any role in the calculations.
+For instance, the user may want to include a column named "s" indicating the spin for each channel, or a column named "channel" providing a label that is more informative than just the integer $i$.
+Such additional columns will be read by SPARSE but will not play any role in the calculation.
 
 The positions of the nodes the values of the numerical potential must be stored in a CSV file with $M$ lines and **NO header**.
-Each line must contain $N^2 + 1$ entries.
+Each line must contain exactly $N^2 + 1$ entries.
 The first entry is the node value $r$.
 The remaining $N^2$ entries are the values of the flattened potential matrix at the given node.
 SPARSE assumes that the potential is flattened in row-major (C-style) order
@@ -72,18 +74,18 @@ EOF
 Below is a dimensional analysis of the inputs.
 
 **Columns of channels.csv:**  
-(1) *l*: dimensionless (it is an integer)  
-(2) *threshold*: [Energy]  
-(3) *mu*: [Mass]  
+(l) dimensionless (it is an integer)  
+(threshold) [Energy]  
+(mu) [Mass]  
 
 **Columns of potential.csv:**  
-(1) *r*: [Length]  
-(2, 3, ..., $N^2 + 1$) *V*: [Energy]  
+(1) [Length]  
+(2, 3, ..., $N^2 + 1$) [Energy]  
 
 The SPARSE algorithm uses natural units, in which $\hbar=c=1$ and therefore $[\text{Mass}]=[\text{Energy}]$ and $[\text{Length}]=[\text{Energy}]^{-1}$.
 There is only one independent dimension, typically chosen between [Length] in units of fm (femtometers) and [Energy] in units of eV (electron Volts).
 The SPARSE algorithm is agnostic to the user's choice of dimension/unit, as long as it is consistent with the prescription $\hbar=c=1$.
-The conversion between length-based and energy-based units is easily achieved by means of the formula $\hbar c = 1 = 197.3$ MeV fm.
+The conversion between length-based and energy-based units is easily achieved by means of the formula $\hbar c = 1 = 197.327$ MeV fm.
 
 ## Repository structure
 
