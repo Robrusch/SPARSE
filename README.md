@@ -46,13 +46,13 @@ or the string "inf" if the potential is confining.
 The ordering of the columns is irrelevant, but it must obviously be consistent between rows.
 The typical structure of a minimal channels' CSV file is therefore:
 
-BOF  
-l, threshold, mu  
-l1, T1, mu1  
-l2, T2, mu2  
-...  
-lN, TN, muN  
-EOF
+```
+l,threshold,mu
+l1,T1,mu1
+l2,T2,mu2
+...
+lN,TN,muN
+```
 
 For the user's convenience, additional information about the channels may be specified by adding more columns.
 For instance, the user may want to include a column named "s" indicating the spin for each channel, or a column named "channel" providing a label that is more informative than just the integer $i$.
@@ -66,12 +66,12 @@ SPARSE assumes that the potential is flattened in row-major (C-style) order
 (this is irrelevant if the potential matrix is symmetric).
 The typical structure of the potential's CSV file is therefore:
 
-BOF  
-r1, V11(r1), V12(r1), ..., V1N(r1), V21(r1), V22(r1), ..., V2N(r1), ..., VN1(r1), VN2(r1), ..., VNN(r1)  
-r2, V11(r2), V12(r2), ..., V1N(r2), V21(r2), V22(r2), ..., V2N(r2), ..., VN1(r2), VN2(r2), ..., VNN(r2)  
-...  
-rM, V11(rM), V12(rM), ..., V1N(rM), V21(rM), V22(rM), ..., V2N(rM), ..., VN1(rN), VN2(rN), ..., VNN(rM)  
-EOF
+``` 
+r1,V11(r1),V12(r1),...,V1N(r1),V21(r1),V22(r1),...,V2N(r1),...,VN1(r1),VN2(r1),...,VNN(r1)
+r2,V11(r2),V12(r2),...,V1N(r2),V21(r2),V22(r2),...,V2N(r2),...,VN1(r2),VN2(r2),...,VNN(r2)
+...
+rM,V11(rM),V12(rM),...,V1N(rM),V21(rM),V22(rM),...,V2N(rM),...,VN1(rN),VN2(rN),...,VNN(rM)
+```
 
 ### An important note about units
 
