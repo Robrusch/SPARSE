@@ -16,9 +16,9 @@ from scipy.sparse.linalg import eigsh
 # Import channel description from file: channels.csv
 channels = pd.read_csv('channels.csv',
                        dtype={
-                           'l': np.int64,
-                           'threshold': np.float64,
-                           'mu': np.float64,
+                           'l': int,
+                           'threshold': float,
+                           'mu': float,
                            })
 channels.rename(index=lambda x: x + 1, inplace=True)
 
@@ -26,7 +26,7 @@ channels.rename(index=lambda x: x + 1, inplace=True)
 potential = pd.read_csv('potential.csv',
                         index_col=0,
                         names=pd.MultiIndex.from_product(2 * [channels.index]),
-                        dtype=np.float64)
+                        dtype=float)
 potential.columns.set_names(['row', 'column'], inplace=True)
 
 # Set up global variables from channel description
@@ -228,8 +228,7 @@ def k_matrices(energies, processes=1):
         kmatrices = [k_matrix(e) for e in energies]
     else:
         with multiprocessing.Pool(processes) as pool:
-            results = pool.map_async(k_matrix, energies)
-            kmatrices = results.get()
+            kmatrices = pool.map(k_matrix, energies, chunksize=1)
     k_array = np.full((len(energies), n, n), np.nan)
     for i, k in enumerate(kmatrices):
         is_open = energies[i] > threshold
