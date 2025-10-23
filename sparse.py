@@ -25,7 +25,7 @@ channels.rename(index=lambda x: x + 1, inplace=True)
 # Import coordinate space and potential matrix from file: potential.csv
 potential = pd.read_csv('potential.csv',
                         index_col=0,
-                        names=pd.MultiIndex.from_product(2 * [channels.index]),
+                        names=pd.MultiIndex.from_product(2 * [channels.index.astype(str)]),
                         dtype=float)
 potential.columns.set_names(['row', 'column'], inplace=True)
 
