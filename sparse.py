@@ -8,8 +8,8 @@ import warnings
 import multiprocessing
 import numpy as np
 import pandas as pd
-from scipy.linalg import solve_banded, inv
-from scipy.integrate import trapezoid
+from scipy.linalg import solve_banded, inv, svd
+from scipy.integrate import simpson
 from scipy.sparse import dia_array
 from scipy.sparse.linalg import eigsh
 
@@ -153,29 +153,37 @@ def k_matrix(energy, rtol=1e-2):
         raise ValueError('Invalid input energy.')
     is_open = energy > threshold
     o = np.count_nonzero(is_open)
-    l_open = l[is_open]
-    t_open = threshold[is_open]
-    mu_open = mu[is_open]
-    p = np.sqrt(2 * mu_open * (energy - t_open))
     ab = hamiltonian.copy()
     ab[n] -= energy
     b = np.zeros((n * m, o))
     boundary = np.eye(o)
-    b[-n:][is_open] = boundary / (2 * mu_open[:, np.newaxis] * dr ** 2)
+    b[-n:][is_open] = boundary / (2 * mu[is_open, np.newaxis] * dr ** 2)
     sol = solve_banded((n, n), ab, b, overwrite_ab=True,
                        overwrite_b=True, check_finite=False)
     vec = sol.reshape(m, n, o)[:, is_open]
     wavefuncs = np.insert(vec, [0, m], [np.zeros((o, o)), boundary], axis=0)
     b = np.empty((o, o))
     a = np.empty_like(b)
-    for i in range(o):
-        dx = dr * p[i]
-        j = (np.pi / dx).round().astype(int) + 1
-        x = r_space[-j:] * p[i] - l_open[i] * np.pi / 2
-        y = wavefuncs[-j:, i].T
-        v = np.sqrt(p[i] / mu_open[i])
-        a[i] = v * trapezoid(y * np.sin(x), dx=dx)
-        b[i] = v * trapezoid(y * np.cos(x), dx=dx)
+    b2 = np.empty_like(b)
+    a2 = np.empty_like(b)
+    for i, j in enumerate(np.argwhere(is_open).flatten()):
+        p = np.sqrt(2 * mu[j] * (energy - threshold[j]))
+        v = np.sqrt(p / mu[j])
+        dx = dr * p
+        x = r_space * p - l[j] * np.pi / 2
+        xmin = max(10 * l[j], r_pot * p)
+        support = x > xmin
+        x = x[support]
+        y = wavefuncs[support, i].T
+        s = v * simpson(y * np.sin(x), dx=dx)
+        c = v * simpson(y * np.cos(x), dx=dx)
+        alpha = x[-1] - x[0]
+        beta = (np.sin(2 * x[-1]) - np.sin(2 * x[0])) / 2
+        gamma = (np.cos(2 * x[-1]) - np.cos(2 * x[0])) / 2
+        eta = alpha ** 2 - beta ** 2 - gamma ** 2
+        a[i] = ((alpha + beta) * s + gamma * c) / eta
+        b[i] = (gamma * s + (alpha - beta) * c) / eta
+    k = b @ inv(a)
     kmatrix_asym = b @ inv(a, overwrite_a=True, check_finite=False)
     kmatrix = (kmatrix_asym + kmatrix_asym.T) / 2
     if not np.allclose(kmatrix_asym, kmatrix, rtol=rtol):
