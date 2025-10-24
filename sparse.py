@@ -8,7 +8,7 @@ import warnings
 import multiprocessing
 import numpy as np
 import pandas as pd
-from scipy.linalg import solve_banded, inv, svd
+from scipy.linalg import solve_banded, inv
 from scipy.integrate import simpson
 from scipy.sparse import dia_array
 from scipy.sparse.linalg import eigsh
@@ -131,7 +131,7 @@ hamiltonian[0] = np.pad(kinetic_off_diag, (n, 0))
 hamiltonian[-1] = np.pad(kinetic_off_diag, (0, n))
 
 
-def k_matrix(energy, rtol=1e-2):
+def k_matrix(energy, rtol=1e-3):
     """
     Compute the K-matrix at a given energy.
 
@@ -158,33 +158,30 @@ def k_matrix(energy, rtol=1e-2):
     b = np.zeros((n * m, o))
     boundary = np.eye(o)
     b[-n:][is_open] = boundary / (2 * mu[is_open, np.newaxis] * dr ** 2)
-    sol = solve_banded((n, n), ab, b, overwrite_ab=True,
-                       overwrite_b=True, check_finite=False)
-    vec = sol.reshape(m, n, o)[:, is_open]
-    wavefuncs = np.insert(vec, [0, m], [np.zeros((o, o)), boundary], axis=0)
-    b = np.empty((o, o))
-    a = np.empty_like(b)
-    b2 = np.empty_like(b)
-    a2 = np.empty_like(b)
+    v = solve_banded((n, n), ab, b, overwrite_ab=True,
+                     overwrite_b=True, check_finite=False)
+    wavefuncs = np.zeros((m + 2, n, o))
+    wavefuncs[0] = 0
+    wavefuncs[-1, is_open] = boundary
+    wavefuncs[1:-1] = v.reshape(m, n, o)
+    x = np.empty((o, o))
+    y = np.empty_like(x)
     for i, j in enumerate(np.argwhere(is_open).flatten()):
         p = np.sqrt(2 * mu[j] * (energy - threshold[j]))
-        v = np.sqrt(p / mu[j])
-        dx = dr * p
-        x = r_space * p - l[j] * np.pi / 2
-        xmin = max(10 * l[j], r_pot * p)
-        support = x > xmin
-        x = x[support]
-        y = wavefuncs[support, i].T
-        s = v * simpson(y * np.sin(x), dx=dx)
-        c = v * simpson(y * np.cos(x), dx=dx)
-        alpha = x[-1] - x[0]
-        beta = (np.sin(2 * x[-1]) - np.sin(2 * x[0])) / 2
-        gamma = (np.cos(2 * x[-1]) - np.cos(2 * x[0])) / 2
-        eta = alpha ** 2 - beta ** 2 - gamma ** 2
-        a[i] = ((alpha + beta) * s + gamma * c) / eta
-        b[i] = (gamma * s + (alpha - beta) * c) / eta
-    k = b @ inv(a)
-    kmatrix_asym = b @ inv(a, overwrite_a=True, check_finite=False)
+        mult = np.sqrt(2 * np.pi * p**3 / mu[j])
+        r_min = max(r_pot, 10 * l[j] / p)
+        lim = int((r_space[-1] - r_min) / dr) + 1
+        z = r_space[-lim:] * p - l[j] * np.pi / 2
+        w = wavefuncs[-lim:, j].transpose()
+        s = mult * simpson(w * np.sin(z), dx=dr)
+        c = mult * simpson(w * np.cos(z), dx=dr)
+        alpha = z[-1] - z[0]
+        beta = (np.sin(2 * z[-1]) - np.sin(2 * z[0])) / 2
+        gamma = (np.cos(2 * z[-1]) - np.cos(2 * z[0])) / 2
+        delta = alpha ** 2 - beta ** 2 - gamma ** 2
+        x[i] = ((alpha + beta) * s + gamma * c) / delta
+        y[i] = (gamma * s + (alpha - beta) * c) / delta
+    kmatrix_asym = y @ inv(x, overwrite_a=True, check_finite=False)
     kmatrix = (kmatrix_asym + kmatrix_asym.T) / 2
     if not np.allclose(kmatrix_asym, kmatrix, rtol=rtol):
         warnings.warn(
