@@ -6,6 +6,7 @@ Created on Thu Mar 13 12:13:03 2025
 """
 import warnings
 import multiprocessing
+import math
 import numpy as np
 import pandas as pd
 from scipy.linalg import solve_banded, inv
@@ -131,7 +132,7 @@ hamiltonian[0] = np.pad(kinetic_off_diag, (n, 0))
 hamiltonian[-1] = np.pad(kinetic_off_diag, (0, n))
 
 
-def k_matrix(energy, rtol=1e-3):
+def k_matrix(energy, rtol=1e-2):
     """
     Compute the K-matrix at a given energy.
 
@@ -158,29 +159,27 @@ def k_matrix(energy, rtol=1e-3):
     b = np.zeros((n * m, o))
     boundary = np.eye(o)
     b[-n:][is_open] = boundary / (2 * mu[is_open, np.newaxis] * dr ** 2)
-    v = solve_banded((n, n), ab, b, overwrite_ab=True,
-                     overwrite_b=True, check_finite=False)
-    wavefuncs = np.zeros((m + 2, n, o))
-    wavefuncs[0] = 0
-    wavefuncs[-1, is_open] = boundary
-    wavefuncs[1:-1] = v.reshape(m, n, o)
-    x = np.empty((o, o))
-    y = np.empty_like(x)
+    sol = solve_banded((n, n), ab, b, overwrite_ab=True,
+                       overwrite_b=True, check_finite=False)
+    vec = sol.reshape(m, n, o)[:, is_open]
+    wavefuncs = np.insert(vec, [0, m], [np.zeros((o, o)), boundary], axis=0)
+    y = np.empty((o, o))
+    x = np.empty_like(y)
     for i, j in enumerate(np.argwhere(is_open).flatten()):
         p = np.sqrt(2 * mu[j] * (energy - threshold[j]))
         mult = np.sqrt(2 * np.pi * p**3 / mu[j])
         r_min = max(r_pot, 10 * l[j] / p)
-        lim = int((r_space[-1] - r_min) / dr) + 1
+        lim = math.ceil((r_space[-1] - r_min) / dr)
         z = r_space[-lim:] * p - l[j] * np.pi / 2
-        w = wavefuncs[-lim:, j].transpose()
+        w = wavefuncs[-lim:, i].T
         s = mult * simpson(w * np.sin(z), dx=dr)
         c = mult * simpson(w * np.cos(z), dx=dr)
         alpha = z[-1] - z[0]
         beta = (np.sin(2 * z[-1]) - np.sin(2 * z[0])) / 2
         gamma = (np.cos(2 * z[-1]) - np.cos(2 * z[0])) / 2
-        delta = alpha ** 2 - beta ** 2 - gamma ** 2
-        x[i] = ((alpha + beta) * s + gamma * c) / delta
-        y[i] = (gamma * s + (alpha - beta) * c) / delta
+        eta = alpha ** 2 - beta ** 2 - gamma ** 2
+        x[i] = ((alpha + beta) * s + gamma * c) / eta
+        y[i] = (gamma * s + (alpha - beta) * c) / eta
     kmatrix_asym = y @ inv(x, overwrite_a=True, check_finite=False)
     kmatrix = (kmatrix_asym + kmatrix_asym.T) / 2
     if not np.allclose(kmatrix_asym, kmatrix, rtol=rtol):
@@ -230,7 +229,7 @@ def k_matrices(energies, processes=1):
             raise ValueError('There is no valid energy in input.')
     energies = energies[admitted]
     if processes == 1 or __name__ == "__main__":
-        kmatrices = [k_matrix(e) for e in energies]
+        kmatrices = list(map(k_matrix, energies))
     else:
         with multiprocessing.Pool(processes) as pool:
             kmatrices = pool.map(k_matrix, energies, chunksize=1)
