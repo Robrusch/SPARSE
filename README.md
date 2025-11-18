@@ -2,7 +2,7 @@
 
 **If this program has been significant in your research, and you wish to acknowledge the project in your publication, I suggest citing the following preprint:**  
 
-*R. Bruschini, SPARSE: Scattering Poles and Amplitudes from Radial Schrödinger Equations, arXiv:2507.01002 [quant-ph].*  
+*R. Bruschini, SPARSE: Scattering Poles and Amplitudes from Radial Schrödinger Equations, [arXiv:2507.01002 [quant-ph]](https://arxiv.org/abs/2507.01002).*  
 
 This algorithm calculates scattering amplitudes from a two-body, multi-channel, radial Schrödinger equation in the form:
 
