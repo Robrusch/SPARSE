@@ -7,55 +7,11 @@ Created on Wed May 28 15:11:17 2025
 import numpy as np
 import pandas as pd
 import warnings
-from scipy.linalg import inv, det
+from scipy.linalg import inv
 from scipy.interpolate import AAA
 
 
-def poles(k_matrix_df, **kwargs):
-    """
-    Calculate scattering poles by extrapolating input K-matrices.
-    NOTE: This function is deprecated, use k_matrix_poles() instead.
-
-    Parameters
-    ----------
-    k_matrix_df : DataFrame
-        Pandas DataFrame containing flattened K-matrices for various energies.
-        This is typically an output of the function k_matrices from the SPARSE
-        module.
-    **kwargs: optional
-        Keyword arguments the function scipy.interpolate.AAA. See its
-        documentation of  for further information.
-
-    Returns
-    -------
-    t_matrix_poles : ndarray
-        The extrapolated scattering poles in the complex energy plane,
-        ordered by increasing real part.
-    k_matrix_poles : ndarray
-        The extrapolated poles of the K-matrix.
-        These poles are not useful per se, but rather as an indication of
-        whether or not there are spurious poles in the extrapolation.
-        Adjust the keyword arguments until there is the correct number and
-        position of K-matrix poles.
-
-    """
-    warnings.warn("This function is deprecated, use k_matrix_poles() instead. The extrapolation of the T-matrix poles for complex energies is numerically unstable. The function poles() will be removed in a future release.", DeprecationWarning, stacklevel=2)
-    x = k_matrix_df.index.to_numpy()
-    y = np.empty(len(x), dtype=np.complex128)
-    for i, kmat in enumerate(k_matrix_df.to_numpy()):
-        kflat = kmat[~np.isnan(kmat)]
-        n = int(np.sqrt(len(kflat)))
-        k = kflat.reshape(n, n)
-        y[i] = det(np.eye(n) - 1j * k, overwrite_a=True, check_finite=False)
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', RuntimeWarning)
-        r = AAA(x, y, **kwargs)
-    k_matrix_poles = np.sort_complex(r.poles())
-    t_matrix_poles = np.sort_complex(r.roots())
-    return t_matrix_poles, k_matrix_poles
-
-
-def k_matrix_poles(k_matrix):
+def poles(k_matrix):
     """
     Calculates scattering poles from the K-matrix.
     Note that this function returns the nominal masses and widths of the poles, not the physical resonance parameters.
