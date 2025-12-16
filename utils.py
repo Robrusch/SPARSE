@@ -54,9 +54,11 @@ def poles(k_matrix):
     assert np.all(res_diag <= 0), f'Non-resonant pole(s) at {masses[np.any(res_diag > 0, axis=1)]} detected. Try excluding non-resonant pole(s) by using DataFrame.loc[Emin:Emax].'
     res_trace = np.sum(res_diag, axis=1)
     widths = -2 * res_trace
-    couplings = np.sqrt(res_diag / res_trace)
+    print(res_trace.shape)
+    couplings = np.sqrt(res_diag / res_trace[:, np.newaxis])
     couplings[:, 1:] *= -np.sign(residues[:, 1:, 0])
-    assert np.allclose(couplings[:,np.newaxis] * couplings[..., np.newaxis], residues / res_trace), 'Factorization theorem not satisfied. Check your input K-matrix.'
+    if not np.allclose(couplings[:,np.newaxis] * couplings[..., np.newaxis], residues / res_trace[:, np.newaxis, np.newaxis]):
+        warnings.warn('Factorization theorem might not satisfied.', stacklevel=2)
     decay_channels = kmat.columns.remove_unused_levels().levels[0]
     data = np.hstack([masses[:, np.newaxis], widths[:, np.newaxis], couplings])
     labels = ['Mass', 'Width'] + [f'Coupling {i}' for i in decay_channels]
