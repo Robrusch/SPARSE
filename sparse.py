@@ -132,6 +132,39 @@ hamiltonian[0] = np.pad(kinetic_off_diag, (n, 0))
 hamiltonian[-1] = np.pad(kinetic_off_diag, (0, n))
 
 
+def wavefunctions(energy, boundary):
+    """
+    Computes the numerical wavefunctions with given boundary conditions
+    at the maximum radius.
+
+    Parameters
+    ----------
+    energy : float
+        Input energy value.
+    boundary : (N, O) ndarray
+        An array containing the boundary conditions for the wavefunctions.
+        The number N of rows must be the number of wavefunction channels.
+        The number O of columns corresponds to the number of wavefunctions
+        with the same energy returned by this function.
+
+    Returns
+    -------
+    (M, N, O) ndarray
+        The numerical wavefunctions with their boundary values.
+
+    """
+    ab = hamiltonian.copy()
+    ab[n] -= energy
+    o = boundary.shape[1]
+    b = np.zeros((n * m, o))
+    b[-n:] = boundary / (2 * mu[:, np.newaxis] * dr ** 2)
+    sol = solve_banded((n, n), ab, b, overwrite_ab=True,
+                       overwrite_b=True, check_finite=False)
+    vec = sol.reshape(m, n, o)
+    wavefuncs = np.insert(vec, [0, m], [np.zeros((n, o)), boundary], axis=0)
+    return wavefuncs
+
+
 def k_matrix(energy, rtol=1e-2):
     """
     Compute the K-matrix at a given energy.
@@ -154,15 +187,9 @@ def k_matrix(energy, rtol=1e-2):
         raise ValueError('Invalid input energy.')
     is_open = energy > threshold
     o = np.count_nonzero(is_open)
-    ab = hamiltonian.copy()
-    ab[n] -= energy
-    b = np.zeros((n * m, o))
-    boundary = np.eye(o)
-    b[-n:][is_open] = boundary / (2 * mu[is_open, np.newaxis] * dr ** 2)
-    sol = solve_banded((n, n), ab, b, overwrite_ab=True,
-                       overwrite_b=True, check_finite=False)
-    vec = sol.reshape(m, n, o)[:, is_open]
-    wavefuncs = np.insert(vec, [0, m], [np.zeros((o, o)), boundary], axis=0)
+    boundary = np.zeros((n, o))
+    boundary[is_open] = np.eye(o)
+    wavefuncs = wavefunctions(energy, boundary)
     y = np.empty((o, o))
     x = np.empty_like(y)
     for i, j in enumerate(np.argwhere(is_open).flatten()):
@@ -171,7 +198,7 @@ def k_matrix(energy, rtol=1e-2):
         r_min = max(r_pot, 10 * l[j] / p)
         lim = math.ceil((r_space[-1] - r_min) / dr)
         z = r_space[-lim:] * p - l[j] * np.pi / 2
-        w = wavefuncs[-lim:, i].T
+        w = wavefuncs[-lim:, j].T
         s = mult * simpson(w * np.sin(z), dx=dr)
         c = mult * simpson(w * np.cos(z), dx=dr)
         alpha = z[-1] - z[0]
