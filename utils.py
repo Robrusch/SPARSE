@@ -57,7 +57,7 @@ def poles(k_matrix):
     couplings = np.sqrt(res_diag / res_trace[:, np.newaxis])
     couplings[:, 1:] *= -np.sign(residues[:, 1:, 0])
     if not np.allclose(couplings[:,np.newaxis] * couplings[..., np.newaxis], residues / res_trace[:, np.newaxis, np.newaxis]):
-        warnings.warn('Factorization theorem might not satisfied.', stacklevel=2)
+        warnings.warn('Factorization theorem might not be satisfied.', stacklevel=2)
     decay_channels = kmat.columns.remove_unused_levels().levels[0]
     data = np.hstack([masses[:, np.newaxis], widths[:, np.newaxis], couplings])
     labels = ['Mass', 'Width'] + [f'Coupling {i}' for i in decay_channels]
@@ -116,4 +116,5 @@ def composition(wavefunc_df):
     prob = np.trapz(psi_squared, wavefunc_df.index.to_numpy(), axis=0)
     order = np.argsort(prob)[::-1]
     return pd.Series(prob[order], wavefunc_df.columns[order])
+
 
