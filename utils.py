@@ -54,7 +54,6 @@ def poles(k_matrix):
     assert np.all(res_diag <= 0), f'Non-resonant pole(s) at {masses[np.any(res_diag > 0, axis=1)]} detected. Try excluding non-resonant pole(s) by using DataFrame.loc[Emin:Emax].'
     res_trace = np.sum(res_diag, axis=1)
     widths = -2 * res_trace
-    print(res_trace.shape)
     couplings = np.sqrt(res_diag / res_trace[:, np.newaxis])
     couplings[:, 1:] *= -np.sign(residues[:, 1:, 0])
     if not np.allclose(couplings[:,np.newaxis] * couplings[..., np.newaxis], residues / res_trace[:, np.newaxis, np.newaxis]):
@@ -117,3 +116,4 @@ def composition(wavefunc_df):
     prob = np.trapz(psi_squared, wavefunc_df.index.to_numpy(), axis=0)
     order = np.argsort(prob)[::-1]
     return pd.Series(prob[order], wavefunc_df.columns[order])
+
