@@ -48,20 +48,33 @@ def poles(k_matrix):
             order = np.argsort(r.poles().real)
             poles[:, i, j] = r.poles().real[order]
             residues[:, i, j] = r.residues().real[order]
-    masses = poles[:, 0, 0]
-    assert np.allclose(poles, masses[:, np.newaxis, np.newaxis]), 'Incompatible pole positions between different channels. Check your input K-matrix.'
+    masses = np.average(poles, axis=(1,2), weights=np.abs(residues))
     res_diag = np.diagonal(residues, axis1=1, axis2=2)
-    assert np.all(res_diag <= 0), f'Non-resonant pole(s) at {masses[np.any(res_diag > 0, axis=1)]} detected. Try excluding non-resonant pole(s) by using DataFrame.loc[Emin:Emax].'
-    res_factorized = res_diag[:,np.newaxis] * res_diag[..., np.newaxis]
-    if not np.allclose(res_factorized, residues**2):
-        warnings.warn('Factorization theorem might not be satisfied.', stacklevel=2)
+    assert np.all(res_diag <= 0),\
+        'Non-resonant poles possibly detected at '\
+            f'{masses[np.any(res_diag > 0, axis=1)]}. '\
+                'Try separating those poles using DataFrame.loc[Emin:Emax] '\
+                    'on your input K-matrix.'
     res_trace = np.sum(res_diag, axis=1)
     widths = -2 * res_trace
     couplings = np.sqrt(res_diag / res_trace[:, np.newaxis])
     couplings[:, 1:] *= -np.sign(residues[:, 1:, 0])
+    masses_diff = np.abs(poles - masses[:, np.newaxis, np.newaxis])
+    masses_err = masses_diff.max(axis=(1,2))
+    res_factorized = res_diag[:,np.newaxis] * res_diag[..., np.newaxis]
+    res_sq_diff = res_factorized - residues**2
+    res_diag_tile = np.tile(res_diag, (n, 1, 1)).transpose(1, 0, 2)
+    res_diag_sums = res_diag_tile + res_diag_tile.transpose(0, 2, 1)
+    res_err = np.abs(res_sq_diff / res_diag_sums).max(axis=(1,2))
+    widths_err = res_err * 2 * n
+    
     decay_channels = kmat.columns.remove_unused_levels().levels[0]
-    data = np.hstack([masses[:, np.newaxis], widths[:, np.newaxis], couplings])
-    labels = ['Mass', 'Width'] + [f'Coupling {i}' for i in decay_channels]
+    data = np.hstack([masses[:, np.newaxis],
+                      masses_err[:, np.newaxis],
+                      widths[:, np.newaxis],
+                      widths_err[:, np.newaxis],
+                      couplings])
+    labels = ['Mass', 'Mass error', 'Width', 'Width error'] + [f'Coupling {i}' for i in decay_channels]
     results = pd.DataFrame(data=data, columns=labels)
     return results
 
