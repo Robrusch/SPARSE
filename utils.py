@@ -7,6 +7,7 @@ Created on Wed May 28 15:11:17 2025
 import numpy as np
 import pandas as pd
 import warnings
+from scipy.integrate import simpson
 from scipy.linalg import inv
 from scipy.interpolate import AAA
 
@@ -127,6 +128,7 @@ def composition(wavefunc_df):
 
     """
     psi_squared = np.square(wavefunc_df.to_numpy())
-    prob = np.trapz(psi_squared, wavefunc_df.index.to_numpy(), axis=0)
+    prob = simpson(psi_squared, wavefunc_df.index.to_numpy(), axis=0)
     order = np.argsort(prob)[::-1]
     return pd.Series(prob[order], wavefunc_df.columns[order])
+
