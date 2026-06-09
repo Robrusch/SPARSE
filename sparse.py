@@ -86,7 +86,7 @@ thresh = np.diag(threshold)
 pot_are_thresh = np.isclose(pot, thresh, atol=1e-8)  # <- may change atol
 # Exclude diagonal elements for confining channels with infinite thresholds
 # by setting the corresponding elements of pot_are_thresh to True.
-pot_are_thresh[np.ix(np.full(m, True), ~scattering, ~scattering)] = True
+pot_are_thresh[np.ix_(np.full(m, True), ~scattering, ~scattering)] = True
 pot_is_thresh = pot_are_thresh.all(axis=(1,2))
 # The potential radius is defined as the largest value of r
 # for which the corresponding value of pot_is_thresh is False.
