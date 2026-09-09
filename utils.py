@@ -12,74 +12,6 @@ from scipy.linalg import inv
 from scipy.interpolate import AAA
 
 
-def poles(k_matrix):
-    """
-    Calculates scattering poles from the K-matrix.
-    Note that this function returns the nominal masses and widths of the poles, not the physical resonance parameters.
-    
-    Parameters
-    ----------
-    k_matrix : DataFrame
-        Pandas DataFrame containing flattened K-matrices for various energies.
-        This is typically an output of the function k_matrices from the SPARSE module.
-    
-    Returns
-    -------
-    DataFrame
-        Pandas DataFrame containing the nominal masses, widths, and couplings of the scattering poles.
-    
-    """
-    kmat = k_matrix.dropna(axis=1, how='all')
-    assert not kmat.isna().any(axis=None), 'Input values span across one or multiple thresholds. Try excluding threshold values by using DataFrame.loc[Emin:Emax].'
-    x = kmat.index.to_numpy()
-    n = int(np.sqrt(len(kmat.columns)))
-    y = kmat.to_numpy().reshape(-1, n, n)
-    sign_change = np.all(y[:-1] * y[1:] < 0, axis=(1,2))
-    large = np.all(np.abs(y[:-1]) > 1, axis=(1,2))
-    n_poles = np.count_nonzero(sign_change & large)
-    assert n_poles > 0, 'Poles could not be detected. Check your input K-matrix.'
-    poles = np.empty((n_poles, n, n))
-    residues = np.empty_like(poles)
-    for i in range(n):
-        for j in range(n):
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', RuntimeWarning)
-                r = AAA(x, y[:, i, j], max_terms=n_poles + 1)
-            assert np.isreal(r.poles).all() and np.isreal(r.residues).all(), 'Polynomial interpolation yields complex poles or residues. Check your input K-matrix.'
-            order = np.argsort(r.poles().real)
-            poles[:, i, j] = r.poles().real[order]
-            residues[:, i, j] = r.residues().real[order]
-    masses = np.average(poles, axis=(1,2), weights=np.abs(residues))
-    res_diag = np.diagonal(residues, axis1=1, axis2=2)
-    assert np.all(res_diag <= 0),\
-        'Non-resonant poles possibly detected at '\
-            f'{masses[np.any(res_diag > 0, axis=1)]}. '\
-                'Try separating those poles using DataFrame.loc[Emin:Emax] '\
-                    'on your input K-matrix.'
-    res_trace = np.sum(res_diag, axis=1)
-    widths = -2 * res_trace
-    couplings = np.sqrt(res_diag / res_trace[:, np.newaxis])
-    couplings[:, 1:] *= -np.sign(residues[:, 1:, 0])
-    masses_diff = np.abs(poles - masses[:, np.newaxis, np.newaxis])
-    masses_err = masses_diff.max(axis=(1,2))
-    res_factorized = res_diag[:,np.newaxis] * res_diag[..., np.newaxis]
-    res_sq_diff = res_factorized - residues**2
-    res_diag_tile = np.tile(res_diag, (n, 1, 1)).transpose(1, 0, 2)
-    res_diag_sums = res_diag_tile + res_diag_tile.transpose(0, 2, 1)
-    res_err = np.abs(res_sq_diff / res_diag_sums).max(axis=(1,2))
-    widths_err = res_err * 2 * n
-    
-    decay_channels = kmat.columns.remove_unused_levels().levels[0]
-    data = np.hstack([masses[:, np.newaxis],
-                      masses_err[:, np.newaxis],
-                      widths[:, np.newaxis],
-                      widths_err[:, np.newaxis],
-                      couplings])
-    labels = ['Mass', 'Mass error', 'Width', 'Width error'] + [f'Coupling {i}' for i in decay_channels]
-    results = pd.DataFrame(data=data, columns=labels)
-    return results
-
-
 def amplitudes(k_matrix_df):
     """
     Calculate scattering amplitudes from the input K-matrices.
@@ -103,14 +35,155 @@ def amplitudes(k_matrix_df):
         kflat = kmat[~np.isnan(kmat)]
         n = int(np.sqrt(len(kflat)))
         k = kflat.reshape(n, n)
-        t = k @ inv(np.eye(n) - 1j * k, overwrite_a=True, check_finite=False)
-        amplitudes[i, ~np.isnan(kmat)] = t.flatten()
+        t = k @ inv(np.eye(n) - 1j * k)
+        amplitudes[i, ~np.isnan(kmat)] = t.flatten()   
     return pd.DataFrame(amplitudes,
                         index=k_matrix_df.index,
                         columns=k_matrix_df.columns)
 
 
-def composition(wavefunc_df):
+def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, pole_spread_tol=1e-3):
+    """
+    Calculates complex poles from the scattering amplitudes for real energies.
+    This function extrapolates the scattering amplitude to complex energies using
+    the AAA algorithm for rational polynomial interpolation.
+    
+    Parameters
+    ----------
+    amplitudes : DataFrame
+        Pandas DataFrame containing flattened scattering amplitudes for various energies.
+    rtol: float, optional
+        Relative tolerance in the AAA algorithm. See the documentation of
+        scipy.optimize.AAA for further information. Default is 1e-4.
+    in_interval: bool, optional
+        Wether to discard extrapolated poles whose real part is found outside
+        of the input energy region. Default is True.
+    extremes_exclusion: float, optional
+        If in_interval is set to True, further exclude extrapolated poles whose
+        real part is found to close to the extremes of the input energy region.
+        Default is do create an exclusion region next to each extreme equal to
+        5% of the total length of the energy interval.
+    pole_spread_tol: float, optional
+        Relative tolerance for the spread of the extrapolated poles found in
+        different channels. If the tolerance is exceeded, a warning is made and
+        the raw data of the pole positions is printed out. Default is 1e-3.  
+
+    Returns
+    -------
+    DataFrame
+        Pandas DataFrame containing the positions and residues of the scattering poles.
+    
+    """
+    amps = amplitudes.dropna(axis=1, how='all')
+    assert not amps.isna().any(axis=None), 'Input values span across one or multiple thresholds. Try excluding threshold values by using DataFrame.loc[Emin:Emax].'
+    x = amps.index.to_numpy()
+    n = int(np.sqrt(len(amps.columns)))
+    y = amps.to_numpy().reshape(-1, n, n)
+    if in_interval:
+        xmin = x[0]
+        xmax = x[-1]
+        if extremes_exclusion > 0:
+            exclude = (xmax - xmin) * extremes_exclusion
+            xmin += exclude
+            xmax -= exclude
+    else:
+        xmin = -np.inf
+        xmax = np.inf
+    poles_matrix = []
+    residues = []
+    for i in range(n):
+        pole_row = []
+        residue_row = []
+        for j in range(n):
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', RuntimeWarning)
+                r = AAA(x, y[:, i, j], rtol=rtol)
+            poles_inside = np.logical_and(r.poles().real > xmin,
+                r.poles().real < xmax)
+            new_poles = r.poles()[poles_inside]
+            new_residues = r.residues()[poles_inside]
+            order = np.argsort(new_poles.real)
+            pole_row.append(new_poles[order])
+            residue_row.append(new_residues[order])
+        poles_matrix.append(pole_row)
+        residues.append(residue_row)
+    try:
+        poles_matrix = np.array(poles_matrix).transpose((2, 0, 1))
+        residues = np.array(residues).transpose((2, 0, 1))
+    except ValueError:
+        raise RuntimeError("Found inconsistent number of poles in different channels.")
+    poles_diag = np.diagonal(poles_matrix, axis1=1, axis2=2)
+    res_diag = np.diagonal(residues, axis1=1, axis2=2)
+    poles = np.average(poles_diag, axis=1, weights=np.abs(res_diag))
+    if not np.allclose(np.expand_dims(poles, axis=(1,2)), poles_matrix, rtol=pole_spread_tol):
+        warnings.warn('Pole position spread across channels exceeds the input tolerance. Check the pole positions below.', stacklevel=2)
+        print(poles_matrix)
+    cols = amplitudes.columns.remove_unused_levels().rename(['Residue row', 'Residue column'])
+    results = pd.DataFrame(data=residues.reshape(-1, n**2),
+        index=pd.Index(poles,name='Pole position'),
+        columns=cols)
+    return results
+
+
+def shifts(k_matrix_df):
+    """
+    Calculate the scattering phase shifts and inelasticities for different
+    energies from the input K-matrix values.
+    
+    Parameters
+    ----------
+    k_matrix_df : DataFrame
+        Pandas DataFrame containing flattened K-matrices for various energies.
+        This is typically an output of the function k_matrices from the SPARSE
+        module.
+
+    Returns
+    -------
+    DataFrame, DataFrame
+        Two Pandas DataFrames containing the flattened scattering phase shifts
+        and inelasticities, respectively. Values corresponding to closed
+        channels are set to NaN.
+    
+    """
+    n_max = int(np.sqrt(k_matrix_df.shape[1]))
+    labels = k_matrix_df.columns.remove_unused_levels().levels[0].rename('')
+    shifts = np.full((len(k_matrix_df), n_max), np.nan)
+    modulo_pi = np.zeros_like(shifts)
+    inelasticities = np.full(k_matrix_df.shape, np.nan)
+    sign_switch = np.ones_like(inelasticities)
+    for i, kmat in enumerate(k_matrix_df.to_numpy()):
+        kflat = kmat[~np.isnan(kmat)]
+        n = int(np.sqrt(len(kflat)))
+        k = kflat.reshape(n, n)
+        s = (np.eye(n) + 1j * k) @ inv(np.eye(n) - 1j * k)
+        shifts[i, :n] = np.angle(np.diagonal(s)) / 2
+        inelasticities[i, ~np.isnan(kmat)] = abs(s).flatten() 
+        if i > 0:
+            skip = shifts[i] - shifts[i-1]
+            skip_up = skip > 1
+            skip_down = skip < -1
+            modulo_pi[i:, skip_up] -= np.pi
+            modulo_pi[i:, skip_down] += np.pi
+        if i > 2:
+            small = inelasticities[i-1] < 1e-3
+            v_shaped = np.logical_and(inelasticities[i-1] < inelasticities[i-2],
+                                      inelasticities[i-1] < inelasticities[i])
+            der_skip = np.logical_and(small, v_shaped)
+            sign_switch[i:, der_skip] *= -1
+    shifts_df = pd.DataFrame(shifts + modulo_pi,
+                             index=k_matrix_df.index,
+                             columns=labels)
+    inelasticities_df = pd.DataFrame(inelasticities * sign_switch,
+                                     index=k_matrix_df.index,
+                                     columns=k_matrix_df.columns)
+    for i, label1 in enumerate(k_matrix_df.columns.remove_unused_levels().levels[0]):
+        for j, label2 in enumerate(k_matrix_df.columns.remove_unused_levels().levels[1]):
+            if j <= i:
+                del inelasticities_df[label1, label2]
+    return shifts_df, inelasticities_df
+
+
+def composition(wavefunc_df, sort=False):
     """
     Calculate the probabilities of a bound state in the various channels.
 
@@ -129,6 +202,11 @@ def composition(wavefunc_df):
     """
     psi_squared = np.square(wavefunc_df.to_numpy())
     prob = simpson(psi_squared, wavefunc_df.index.to_numpy(), axis=0)
-    order = np.argsort(prob)[::-1]
-    return pd.Series(prob[order], wavefunc_df.columns[order])
-
+    if sort:
+        order = np.argsort(prob)[::-1]
+        data = prob[order]
+        columns = wavefunc_df.columns[order]
+    else:
+        data = prob
+        columns = wavefunc_df.columns
+    return pd.Series(data, columns)

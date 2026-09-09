@@ -6,11 +6,11 @@ Created on Thu Mar 13 12:13:03 2025
 """
 import warnings
 import multiprocessing
-import math
 import numpy as np
 import pandas as pd
 from scipy.linalg import solve_banded, inv
-from scipy.integrate import simpson
+from scipy.special import spherical_jn, spherical_yn
+from scipy.optimize import brentq
 from scipy.sparse import dia_array
 from scipy.sparse.linalg import eigsh
 
@@ -26,7 +26,9 @@ channels.rename(index=lambda x: x + 1, inplace=True)
 # Import coordinate space and potential matrix from file: potential.csv
 potential = pd.read_csv('potential.csv',
                         index_col=0,
-                        names=pd.MultiIndex.from_product(2 * [channels.index.astype(str)]),
+                        names=pd.MultiIndex.from_product(
+                            2 * [channels.index.astype(str)]
+                            ),
                         dtype=float)
 potential.columns.set_names(['row', 'column'], inplace=True)
 
@@ -64,51 +66,19 @@ pmax = np.pi / dr
 # the potentials for non-scattering channels, whichever is smaller.
 emax_scattering = pmax**2 / (2 * mu[scattering]) + threshold[scattering]
 emax_bound = pot[-1].diagonal()[~scattering]
-emax = np.concatenate((emax_scattering, emax_bound)).min()
+# The energy must be smaller than 10% of the upper limit
+emax = np.concatenate((emax_scattering, emax_bound)).min() / 10
 
-# Establish exclusion zones for energies too close to finite thresholds.
-# The limits consist of a pair of energies for each scattering channel.
-# Energies within any such pair of values are excluded.
-elims = np.empty((2, np.count_nonzero(scattering)))
-
-# Energies below threshold are limited by the maximum binding momentum.
-# Calculate the minimum binding momentum based on the maximum distance.
-# The first number in the numerator should be bigger than 1.
-bound_p_min = 10 / r_space[-1]  # <- may change "10"
-elims[0] = threshold[scattering] \
-    - bound_p_min ** 2 / (2 * mu[scattering])
-
-# Energies above threshold are limited by the minimum scattering momentum.
-# Calculate the radius of the potential for scattering channels.
-# The difference between the potential and threshold matrices is considered
-# zero if its value is less than atol.
-thresh = np.diag(threshold)
-pot_are_thresh = np.isclose(pot, thresh, atol=1e-8)  # <- may change atol
-# Exclude diagonal elements for confining channels with infinite thresholds
-# by setting the corresponding elements of pot_are_thresh to True.
-pot_are_thresh[np.ix_(np.full(m, True), ~scattering, ~scattering)] = True
-pot_is_thresh = pot_are_thresh.all(axis=(1,2))
-# The potential radius is defined as the largest value of r
-# for which the corresponding value of pot_is_thresh is False.
-# Check that the potential radius is within the coordinate space.
-assert pot_is_thresh[-1], \
+# Confirm tha the potential for scattering channels is negligible at
+# the maximum integration radius. Excluding diagonal elements for
+# confining channels with infinite thresholds.
+# Then, calculate the potential radius.
+pot_is_thresh = np.isclose(pot, np.diag(threshold)[np.newaxis])
+pot_is_thresh[:, ~scattering, ~scattering] = True
+assert pot_is_thresh[-1].all(),\
     'Potential matrix at maximum radius is significantly different from' \
         'threshold matrix, check your channels and potential.'
-# Calculate the potential radius.
-if all(pot_is_thresh):
-    r_pot = 0
-else:
-    r_pot = r[~pot_is_thresh][-1]
-# Calculate the minimum scattering momentum based on the potential radius.
-free_p_min_pot = np.pi / (r_space[-1] - r_pot)
-# Calculate the minimum scattering momentum from the condition that the
-# analytic scattering states are approximately sine and cosine functions.
-# The number in the numerator should be bigger than 1.
-free_p_min_l = (10 * l[scattering] + np.pi) / r_space[-1] # <- may change "10"
-# The minimum scattering momentum is the largest between those two.
-free_p_min = np.maximum(free_p_min_pot, free_p_min_l)
-elims[1] = threshold[scattering] \
-    + free_p_min ** 2 / (2 * mu[scattering])
+pot_radius_ix = np.argwhere(np.logical_not(pot_is_thresh).any(axis=(1,2)))[-1, 0]
 
 # Calculate the sparse Hamiltonian matrix.
 # The Hamiltonian matrix is a real, square matrix of dimension (n * m)^2.
@@ -165,7 +135,7 @@ def wavefunctions(energy, boundary):
     return wavefuncs
 
 
-def k_matrix(energy, rtol=1e-2):
+def k_matrix(energy):
     """
     Compute the K-matrix at a given energy.
 
@@ -182,36 +152,36 @@ def k_matrix(energy, rtol=1e-2):
         The K-matrix for the N open channels at the input energy.
 
     """
-    if np.logical_and(energy > elims[0], energy < elims[1]).any() \
-        or energy < emin or energy > emax:
-        raise ValueError('Invalid input energy.')
+    assert energy > emin, f'Energies must be higher than {emin}. '\
+        '(No scattering for energies below the lowest threshold).'
+    assert energy < emax, f'Energies must be lower than {emax}. '\
+        '(Increase the maximum radius and/or decrease the '\
+            'discretization step to increase the maximum energy).'
     is_open = energy > threshold
-    o = np.count_nonzero(is_open)
+    o = np.count_nonzero(is_open)    
+    p = np.sqrt(2 * mu[is_open] * (energy - threshold[is_open]))
+    norm = np.sqrt(2 * mu[is_open] / (np.pi * p))
     boundary = np.zeros((n, o))
-    boundary[is_open] = np.eye(o)
+    boundary[is_open] = np.diag(norm)
     wavefuncs = wavefunctions(energy, boundary)
-    y = np.empty((o, o))
-    x = np.empty_like(y)
-    for i, j in enumerate(np.argwhere(is_open).flatten()):
-        p = np.sqrt(2 * mu[j] * (energy - threshold[j]))
-        mult = np.sqrt(2 * np.pi * p**3 / mu[j])
-        r_min = max(r_pot, 10 * l[j] / p)
-        lim = math.ceil((r_space[-1] - r_min) / dr)
-        z = r_space[-lim:] * p - l[j] * np.pi / 2
-        w = wavefuncs[-lim:, j].T
-        s = mult * simpson(w * np.sin(z), dx=dr)
-        c = mult * simpson(w * np.cos(z), dx=dr)
-        alpha = z[-1] - z[0]
-        beta = (np.sin(2 * z[-1]) - np.sin(2 * z[0])) / 2
-        gamma = (np.cos(2 * z[-1]) - np.cos(2 * z[0])) / 2
-        eta = alpha ** 2 - beta ** 2 - gamma ** 2
-        x[i] = ((alpha + beta) * s + gamma * c) / eta
-        y[i] = (gamma * s + (alpha - beta) * c) / eta
+    u = wavefuncs[pot_radius_ix:, is_open] / norm[..., np.newaxis]
+    li = l[np.newaxis, is_open]
+    z = np.outer(r_space[pot_radius_ix:], p)
+    s = np.expand_dims(z * spherical_jn(li, z), axis=2)
+    c = np.expand_dims(- z * spherical_yn(li, z), axis=2)
+    alpha = np.sum(s ** 2, axis=0)
+    beta = np.sum(c ** 2, axis=0)
+    gamma = np.sum(s * c, axis=0)
+    delta = alpha * beta - gamma ** 2
+    a = np.sum(u * s, axis=0)
+    b = np.sum(u * c, axis=0)
+    x = (beta * a - gamma * b) / delta
+    y = (alpha * b - gamma * a) / delta
     kmatrix_asym = y @ inv(x, overwrite_a=True, check_finite=False)
     kmatrix = (kmatrix_asym + kmatrix_asym.T) / 2
-    if not np.allclose(kmatrix_asym, kmatrix, rtol=rtol):
+    if not np.allclose(kmatrix_asym, kmatrix):
         warnings.warn(
-            f'Asymmetry tolerance exceeded for E={energy}.',
+            f'K-matrix asymmetry detected for E={energy}.',
             RuntimeWarning, stacklevel=2)
     return kmatrix
 
@@ -237,21 +207,20 @@ def k_matrices(energies, processes=1):
         Matrix elements corresponding to closed channels are set to NaN.
 
     """
-    if type(energies) != np.ndarray:
-        raise TypeError('Energies must be provided as a numpy array.')
-    below = energies < elims[0, ..., np.newaxis]
-    above = energies > elims[1, ..., np.newaxis]
-    away = np.logical_or(below, above).all(axis=0)
-    between = np.logical_and(energies > emin, energies < emax)
-    admitted = np.logical_and(away, between)
+    above_emin = energies > emin
+    below_emax = energies < emax
+    admitted = np.logical_and(above_emin, below_emax)
     if not admitted.all():
         excluded = np.count_nonzero(~admitted)
-        out_of_bounds = np.count_nonzero(~between)
-        close_to_threshold = np.count_nonzero(~away)
-        warnings.warn(f'Removing {excluded} energy values from input '
-                      f'({close_to_threshold} too close to threshold, '
-                      f'{out_of_bounds} outside energy limits)',
-                      stacklevel=2)
+        warning = f'Removing {excluded} invalid energy value(s) from input.'
+        if not above_emin.all():
+            warning += f'Energies must be higher than {emin}. '\
+                '(No scattering for energies below the lowest threshold).'
+        if not below_emax.all():
+            warning += f'Energies must be lower than {emax}. '\
+                '(Increase the maximum radius and/or decrease the '\
+                    'discretization step to increase the maximum energy).'
+        warnings.warn(warning, stacklevel=2)
         if not admitted.any():
             raise ValueError('There is no valid energy in input.')
     energies = energies[admitted]
@@ -267,6 +236,92 @@ def k_matrices(energies, processes=1):
     k_flat = k_array.reshape(len(energies), -1)
     kdf = pd.DataFrame(k_flat, index=energies, columns=potential.columns)
     return kdf.dropna(axis=1, how='all')
+
+
+def k_matrix_pole(e1, e2, de, epsilon=None, points=100, deg=10, processes=1):
+    """
+    Calculate a K-matrix pole and its residues in a given energy interval.
+    
+    Parameters
+    ----------
+    e1: float
+        The lower extreme of the energy interval.
+    
+    e2: float
+        The higher extreme of the energy interval.
+    
+    de: float
+        Interval around the pole position used to calculate the residue.
+    
+    epsilon: float, optional
+        Exclude values closer than epsilon to the pole position when calculating
+        the residue. The default epsilon=None correspond to using epsilon=de.
+    
+    points: int, optional
+        Number of discrete energy points used when calculating the residue of
+        the K-matrix. Default is 100.
+    
+    deg: int, optional
+        Maximum number of the polynomial used in the interpolation around the
+        pole position, used to calculate the pole residue. Default is 10.
+    
+    processes: int, optional
+        How many processes to use to calculate the pole residue. Default is 1,
+        which does not invoke multiprocessing.
+    
+    Returns
+    -------
+        float, float, (,N) ndarray
+        The nominal mass, nominal width, and nominal couplings of the pole.
+        
+    """
+    assert e1 < e2, 'e1 must be smaller than e2.'
+    threshold_between = np.logical_and(threshold >= e1, threshold <= e2)
+    assert not any(threshold_between), 'Energy interval includes threshold(s)'\
+        f'at {threshold[threshold_between]}'
+    assert e1 > emin, f'Energy interval must be higher than {emin}. '\
+        '(No scattering for energies below the lowest threshold).'
+    assert e2 < emax, f'Energy interval must be lower than {emax}. '\
+        '(Increase the maximum radius and/or decrease the '\
+            'discretization step to increase the maximum energy).'
+    mass = brentq(lambda e: 1 / np.trace(k_matrix(e)), e1, e2)
+    assert abs(np.trace(k_matrix(mass))) > 1, 'Found zero of K-matrix trace '\
+        f'at {mass}.'
+    if epsilon is None:
+        epsilon = de
+    eminus = np.linspace(mass - epsilon / 2 - de * (points - 1),
+                         mass - epsilon / 2,
+                         points)
+    threshold_below = max(threshold[threshold < mass])
+    eminus = eminus[eminus > threshold_below]
+    eplus = np.linspace(mass + epsilon / 2,
+                        mass + epsilon / 2 + de * (points - 1),
+                        points)
+    try:
+        threshold_above = min(threshold[threshold > mass])
+    except ValueError:
+        threshold_above = np.inf
+    eplus = eplus[eplus < threshold_above]
+    en = np.concat((eminus, eplus))
+    kmat = k_matrices(en, processes)
+    o = int(np.sqrt(len(kmat.columns)))
+    k = kmat.to_numpy().reshape(-1, o, o).transpose(1,2,0)
+    x = kmat.index.to_numpy() - mass
+    y = k * x
+    residues = np.empty((o, o))
+    for i in range(o):
+        for j in range(o):        
+            poly = np.polynomial.Polynomial.fit(x, y[i, j], deg)
+            residues[i, j] = poly.convert().coef[0]
+    res_diag = np.diagonal(residues)
+    assert np.all(res_diag <= 0),\
+        f'Non-resonant poles detected at {mass}.'\
+            f' The diagonal of the residue matrix is {res_diag}.'
+    res_trace = np.trace(residues)
+    width = -2 * res_trace
+    couplings = np.sign(-residues[0]) *\
+        np.sqrt(res_diag / res_trace)
+    return mass, width, couplings
 
 
 def bound_states(n_states, energy_guess):
@@ -303,10 +358,6 @@ def bound_states(n_states, energy_guess):
         eigenvectors = eigenvectors[..., ~above]
     if len(eigenvalues) == 0:
         raise RuntimeError('No bound states found')
-    if any(scattering):
-        if any(eigenvalues > elims[0].min()):
-            warnings.warn(f'States above {elims[0].min()} may be distorted',
-                          RuntimeWarning, stacklevel=2)
     norm_vec = eigenvectors.reshape(m, n, n_states) / np.sqrt(dr)
     wavefuncs = np.insert(norm_vec, [0, m], 0, axis=0)
     wave_functions = np.empty(n_states, dtype=object)
@@ -315,4 +366,3 @@ def bound_states(n_states, energy_guess):
                                          index=r_space,
                                          columns=channels.index)
     return eigenvalues, wave_functions
-
