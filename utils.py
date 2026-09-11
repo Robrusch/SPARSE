@@ -42,7 +42,7 @@ def amplitudes(k_matrix_df):
                         columns=k_matrix_df.columns)
 
 
-def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, pole_spread_tol=1e-3):
+def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, imag_cutoff=2e-1, pole_spread_tol=1e-3):
     """
     Calculates complex poles from the scattering amplitudes for real energies.
     This function extrapolates the scattering amplitude to complex energies using
@@ -63,6 +63,9 @@ def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, pole
         real part is found to close to the extremes of the input energy region.
         Default is do create an exclusion region next to each extreme equal to
         5% of the total length of the energy interval.
+    imag_cutoff: float, optional
+        Exclude poles whose imaginary part is more than this fraction of the
+        length spanned by the input energies. Default is 20%.
     pole_spread_tol: float, optional
         Relative tolerance for the spread of the extrapolated poles found in
         different channels. If the tolerance is exceeded, a warning is made and
@@ -98,8 +101,10 @@ def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, pole
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
                 r = AAA(x, y[:, i, j], rtol=rtol)
-            poles_inside = np.logical_and(r.poles().real > xmin,
-                r.poles().real < xmax)
+            inside_real = np.logical_and(r.poles().real > xmin,
+                                         r.poles().real < xmax)
+            inside_imag = np.abs(r.poles().imag) < imag_cutoff * (x[-1] - x[0])
+            poles_inside = np.logical_and(inside_real, inside_imag)
             new_poles = r.poles()[poles_inside]
             new_residues = r.residues()[poles_inside]
             order = np.argsort(new_poles.real)
