@@ -42,7 +42,7 @@ def amplitudes(k_matrix_df):
                         columns=k_matrix_df.columns)
 
 
-def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, imag_cutoff=2e-1, pole_spread_tol=1e-3):
+def poles(amplitudes, rtol=1e-4, real_cutoff=5e-2, imag_cutoff=2e-1, pole_spread_tol=1e-3):
     """
     Calculates complex poles from the scattering amplitudes for real energies.
     This function extrapolates the scattering amplitude to complex energies using
@@ -55,17 +55,17 @@ def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, imag
     rtol: float, optional
         Relative tolerance in the AAA algorithm. See the documentation of
         scipy.optimize.AAA for further information. Default is 1e-4.
-    in_interval: bool, optional
-        Wether to discard extrapolated poles whose real part is found outside
-        of the input energy region. Default is True.
-    extremes_exclusion: float, optional
-        If in_interval is set to True, further exclude extrapolated poles whose
-        real part is found to close to the extremes of the input energy region.
-        Default is do create an exclusion region next to each extreme equal to
-        5% of the total length of the energy interval.
+    real_cutoff: float, optional
+        Exclude extrapolated poles whose real part is found outside the input
+        energy region or whose distance from either extreme is less than this
+        fraction of the length spanned by the input energies. Default is 5%.
+        Set this parameter to None if you want the function to return poles
+        outside of the input energy region.
     imag_cutoff: float, optional
-        Exclude poles whose imaginary part is more than this fraction of the
-        length spanned by the input energies. Default is 20%.
+        Exclude extrapolated poles whose imaginary part is more than this
+        fraction of the length spanned by the input energies. Default is 20%.
+        Set this parameter to None if you want the function to return poles with
+        a larger imaginary part.
     pole_spread_tol: float, optional
         Relative tolerance for the spread of the extrapolated poles found in
         different channels. If the tolerance is exceeded, a warning is made and
@@ -82,13 +82,10 @@ def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, imag
     x = amps.index.to_numpy()
     n = int(np.sqrt(len(amps.columns)))
     y = amps.to_numpy().reshape(-1, n, n)
-    if in_interval:
-        xmin = x[0]
-        xmax = x[-1]
-        if extremes_exclusion > 0:
-            exclude = (xmax - xmin) * extremes_exclusion
-            xmin += exclude
-            xmax -= exclude
+    if real_cutoff is not None:
+        exclude = (x[-1] - x[0]) * real_cutoff
+        xmin = x[0] + exclude
+        xmax = x[-1] - exclude
     else:
         xmin = -np.inf
         xmax = np.inf
@@ -103,7 +100,10 @@ def poles(amplitudes, rtol=1e-4, in_interval=True, extremes_exclusion=5e-2, imag
                 r = AAA(x, y[:, i, j], rtol=rtol)
             inside_real = np.logical_and(r.poles().real > xmin,
                                          r.poles().real < xmax)
-            inside_imag = np.abs(r.poles().imag) < imag_cutoff * (x[-1] - x[0])
+            if imag_cutoff is not None:
+                inside_imag = np.abs(r.poles().imag) < imag_cutoff * (x[-1] - x[0])
+            else:
+                inside_imag = True
             poles_inside = np.logical_and(inside_real, inside_imag)
             new_poles = r.poles()[poles_inside]
             new_residues = r.residues()[poles_inside]
