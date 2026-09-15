@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 from scipy.linalg import solve_banded, inv
 from scipy.special import spherical_jn, spherical_yn
-from scipy.optimize import brentq
 from scipy.sparse import dia_array
 from scipy.sparse.linalg import eigsh
 

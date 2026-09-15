@@ -10,6 +10,7 @@ import warnings
 from scipy.integrate import simpson
 from scipy.linalg import inv
 from scipy.interpolate import AAA
+import matplotlib.pyplot as plt
 
 
 def amplitudes(k_matrix_df):
@@ -30,31 +31,35 @@ def amplitudes(k_matrix_df):
         Matrix elements corresponding to closed channels are set to NaN.
 
     """
-    amplitudes = np.full(k_matrix_df.shape, np.nan + 1j * np.nan)
+    amps = np.full(k_matrix_df.shape, np.nan + 1j * np.nan)
     for i, kmat in enumerate(k_matrix_df.to_numpy()):
         kflat = kmat[~np.isnan(kmat)]
         n = int(np.sqrt(len(kflat)))
         k = kflat.reshape(n, n)
         t = k @ inv(np.eye(n) - 1j * k)
-        amplitudes[i, ~np.isnan(kmat)] = t.flatten()   
-    return pd.DataFrame(amplitudes,
+        amps[i, ~np.isnan(kmat)] = t.flatten()   
+    return pd.DataFrame(amps,
                         index=k_matrix_df.index,
                         columns=k_matrix_df.columns)
 
 
-def poles(amplitudes, rtol=1e-4, real_cutoff=5e-2, imag_cutoff=2e-1, pole_spread_tol=1e-3):
+def poles(inputs, rtol=1e-4, max_terms=100, real_cutoff=5e-2, imag_cutoff=2e-1, pole_spread_tol=1e-3):
     """
-    Calculates complex poles from the scattering amplitudes for real energies.
-    This function extrapolates the scattering amplitude to complex energies using
-    the AAA algorithm for rational polynomial interpolation.
+    Calculates poles from the input K-matrix or scattering amplitudes
+    for real energies using the AAA algorithm for rational approximation.
     
     Parameters
     ----------
-    amplitudes : DataFrame
-        Pandas DataFrame containing flattened scattering amplitudes for various energies.
+    inputs : DataFrame
+        Pandas DataFrame containing flattened scattering amplitudes or K-matrices
+        for various energies. Typically the output of the function k_matrices or
+        amplitudes from the SPARSE module.
     rtol: float, optional
         Relative tolerance in the AAA algorithm. See the documentation of
         scipy.optimize.AAA for further information. Default is 1e-4.
+    max_terms: int, optional
+        Max number of terms in the AAA algorithm. See the documentation of
+        scipy.optimize.AAA for further information. Default is 100.
     real_cutoff: float, optional
         Exclude extrapolated poles whose real part is found outside the input
         energy region or whose distance from either extreme is less than this
@@ -77,11 +82,11 @@ def poles(amplitudes, rtol=1e-4, real_cutoff=5e-2, imag_cutoff=2e-1, pole_spread
         Pandas DataFrame containing the positions and residues of the scattering poles.
     
     """
-    amps = amplitudes.dropna(axis=1, how='all')
-    assert not amps.isna().any(axis=None), 'Input values span across one or multiple thresholds. Try excluding threshold values by using DataFrame.loc[Emin:Emax].'
-    x = amps.index.to_numpy()
-    n = int(np.sqrt(len(amps.columns)))
-    y = amps.to_numpy().reshape(-1, n, n)
+    inputs_nona = inputs.dropna(axis=1, how='all')
+    assert not inputs_nona.isna().any(axis=None), 'Input values span across one or multiple thresholds. Try excluding threshold values by using DataFrame.loc[Emin:Emax].'
+    x = inputs_nona.index.to_numpy()
+    n = int(np.sqrt(len(inputs_nona.columns)))
+    y = inputs_nona.to_numpy().reshape(-1, n, n)
     if real_cutoff is not None:
         exclude = (x[-1] - x[0]) * real_cutoff
         xmin = x[0] + exclude
@@ -97,7 +102,7 @@ def poles(amplitudes, rtol=1e-4, real_cutoff=5e-2, imag_cutoff=2e-1, pole_spread
         for j in range(n):
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', RuntimeWarning)
-                r = AAA(x, y[:, i, j], rtol=rtol)
+                r = AAA(x, y[:, i, j], rtol=rtol, max_terms=max_terms)
             inside_real = np.logical_and(r.poles().real > xmin,
                                          r.poles().real < xmax)
             if imag_cutoff is not None:
@@ -123,7 +128,7 @@ def poles(amplitudes, rtol=1e-4, real_cutoff=5e-2, imag_cutoff=2e-1, pole_spread
     if not np.allclose(np.expand_dims(poles, axis=(1,2)), poles_matrix, rtol=pole_spread_tol):
         warnings.warn('Pole position spread across channels exceeds the input tolerance. Check the pole positions below.', stacklevel=2)
         print(poles_matrix)
-    cols = amplitudes.columns.remove_unused_levels().rename(['Residue row', 'Residue column'])
+    cols = inputs_nona.columns.remove_unused_levels().rename(['Residue row', 'Residue column'])
     results = pd.DataFrame(data=residues.reshape(-1, n**2),
         index=pd.Index(poles,name='Pole position'),
         columns=cols)
