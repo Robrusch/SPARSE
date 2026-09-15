@@ -10,7 +10,6 @@ import warnings
 from scipy.integrate import simpson
 from scipy.linalg import inv
 from scipy.interpolate import AAA
-import matplotlib.pyplot as plt
 
 
 def amplitudes(k_matrix_df):
